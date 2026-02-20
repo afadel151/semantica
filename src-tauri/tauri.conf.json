@@ -8,19 +8,23 @@
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "cd ./frontend && bun run dev",
     "beforeBuildCommand": "cd ./frontend && bun run generate"
-  },    
+  },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "Semantica",
         "width": 1200,
         "height": 800,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "visible": false
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousDisableAssetCspModification": true
     }
   },
   "bundle": {
@@ -33,6 +37,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/backend-server"]
+    "externalBin": ["binaries/backend-server"],
+    "resources": ["splashscreen.html"]
   }
 }
