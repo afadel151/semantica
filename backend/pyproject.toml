@@ -7,7 +7,10 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.4",
     "fastapi>=0.129.0",
+    "owlrl>=7.1.4",
     "pyinstaller>=6.19.0",
+    "rdflib>=7.6.0",
+    "rdflib-jsonld>=0.6.2",
     "sqlalchemy>=2.0.46",
     "uvicorn>=0.41.0",
 ]

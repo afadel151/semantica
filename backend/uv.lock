@@ -63,7 +63,10 @@ source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "fastapi" },
+    { name = "owlrl" },
     { name = "pyinstaller" },
+    { name = "rdflib" },
+    { name = "rdflib-jsonld" },
     { name = "sqlalchemy" },
     { name = "uvicorn" },
 ]
@@ -79,8 +82,11 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.4" },
     { name = "fastapi", specifier = ">=0.129.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.0" },
+    { name = "owlrl", specifier = ">=7.1.4" },
     { name = "pyinstaller", specifier = ">=6.19.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
+    { name = "rdflib", specifier = ">=7.6.0" },
+    { name = "rdflib-jsonld", specifier = ">=0.6.2" },
     { name = "sqlalchemy", specifier = ">=2.0.46" },
     { name = "uvicorn", specifier = ">=0.41.0" },
 ]
@@ -314,6 +320,18 @@ wheels = [
 ]
 
 [[package]]
+name = "owlrl"
+version = "7.1.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rdflib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d1/fc/ce12482d096d65fff01af58f555a6f25e9dbf416fad5d99f91eaab0e11ca/owlrl-7.1.4.tar.gz", hash = "sha256:60bd4067e346b9111f0a2924565afe97ac6595b98b2bbe953928b5113971daf7", size = 44420, upload-time = "2025-07-29T00:17:27.608Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/de/78/f857ff1a7207e967dc5e8414bbcc15e0aa5cf45f693b1d2ebe2afb3eb1ce/owlrl-7.1.4-py3-none-any.whl", hash = "sha256:e78b46020169783345636da93a467d318f18700c483184dd15e885850cf64775", size = 51981, upload-time = "2025-07-29T00:17:26.229Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -477,6 +495,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyparsing"
+version = "3.3.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f3/91/9c6ee907786a473bf81c5f53cf703ba0957b23ab84c264080fb5a450416f/pyparsing-3.3.2.tar.gz", hash = "sha256:c777f4d763f140633dcb6d8a3eda953bf7a214dc4eff598413c070bcdc117cbc", size = 6851574, upload-time = "2026-01-21T03:57:59.36Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/bd/c038d7cc38edc1aa5bf91ab8068b63d4308c66c4c8bb3cbba7dfbc049f9c/pyparsing-3.3.2-py3-none-any.whl", hash = "sha256:850ba148bd908d7e2411587e247a1e4f0327839c40e2e5e6d05a007ecc69911d", size = 122781, upload-time = "2026-01-21T03:57:55.912Z" },
+]
+
+[[package]]
 name = "pytest"
 version = "9.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -499,6 +526,30 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/85/9f/01a1a99704853cb63f253eea009390c88e7131c67e66a0a02099a8c917cb/pywin32-ctypes-0.2.3.tar.gz", hash = "sha256:d162dc04946d704503b2edc4d55f3dba5c1d539ead017afa00142c38b9885755", size = 29471, upload-time = "2024-08-14T10:15:34.626Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/de/3d/8161f7711c017e01ac9f008dfddd9410dff3674334c233bde66e7ba65bbf/pywin32_ctypes-0.2.3-py3-none-any.whl", hash = "sha256:8a1513379d709975552d202d942d9837758905c8d01eb82b8bcc30918929e7b8", size = 30756, upload-time = "2024-08-14T10:15:33.187Z" },
+]
+
+[[package]]
+name = "rdflib"
+version = "7.6.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyparsing" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/98/f5/18bb77b7af9526add0c727a3b2048959847dc5fb030913e2918bf384fec3/rdflib-7.6.0.tar.gz", hash = "sha256:6c831288d5e4a5a7ece85d0ccde9877d512a3d0f02d7c06455d00d6d0ea379df", size = 4943826, upload-time = "2026-02-13T07:15:55.938Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/10/c2/6604a71269e0c1bd75656d5a001432d16f2cc5b8c057140ec797155c295e/rdflib-7.6.0-py3-none-any.whl", hash = "sha256:30c0a3ebf4c0e09215f066be7246794b6492e054e782d7ac2a34c9f70a15e0dd", size = 615416, upload-time = "2026-02-13T07:15:46.487Z" },
+]
+
+[[package]]
+name = "rdflib-jsonld"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rdflib" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cd/1a/627de985dffc11b486eb07be86dc9a16c25b4877905f5f6a0be3633addb0/rdflib-jsonld-0.6.2.tar.gz", hash = "sha256:107cd3019d41354c31687e64af5e3fd3c3e3fa5052ce635f5ce595fd31853a63", size = 12449, upload-time = "2021-09-18T03:04:27.881Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/29/92/da92898b2aab0da78207afc9c035a71bedef3544966374c44e9627d761c5/rdflib_jsonld-0.6.2-py2.py3-none-any.whl", hash = "sha256:011afe67672353ca9978ab9a4bee964dff91f14042f2d8a28c22a573779d2f8b", size = 4029, upload-time = "2021-09-18T03:04:26.34Z" },
 ]
 
 [[package]]
