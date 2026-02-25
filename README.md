@@ -72,7 +72,7 @@ uv sync
 3. compile fastAPI to binary
 ```bash
 cd backend
-pyinstaller --onefile --name backend-server main.py
+pyinstaller backend-server.spec
 ```
 4. Register the sidecar in Tauri
 ```bash
