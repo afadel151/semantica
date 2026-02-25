@@ -1,25 +1,73 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+block_cipher = None
 
 a = Analysis(
-    ['main.py'],
-    pathex=[],
+    ['app/main.py'],  
+    pathex=['.'],  
     binaries=[],
-    datas=[],
-    hiddenimports=[],
+    datas=[
+        
+        ('app', 'app'),
+    ],
+    hiddenimports=[
+        # FastAPI and Uvicorn
+        'uvicorn.logging',
+        'uvicorn.loops',
+        'uvicorn.loops.auto',
+        'uvicorn.protocols',
+        'uvicorn.protocols.http',
+        'uvicorn.protocols.http.auto',
+        'uvicorn.protocols.websockets',
+        'uvicorn.protocols.websockets.auto',
+        'uvicorn.lifespan',
+        'uvicorn.lifespan.on',
+        
+        # SQLAlchemy
+        'sqlalchemy.dialects.sqlite',
+        'sqlalchemy.dialects.postgresql',
+        'sqlalchemy.ext.declarative',
+        
+        # Your app modules
+        'app',
+        'app.main',
+        'app.api',
+        'app.api.main',
+        'app.api.routes',
+        'app.core',
+        'app.core.config',
+        'app.core.db',
+        'app.models',
+        'app.utils',
+        
+        # Pydantic
+        'pydantic',
+        'pydantic.json',
+        'pydantic_core',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        'matplotlib',
+        'pandas',
+        'numpy',
+        'scipy',
+        'PIL',
+    ],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
     noarchive=False,
-    optimize=0,
 )
-pyz = PYZ(a.pure)
+
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
+    a.zipfiles,
     a.datas,
     [],
     name='backend-server',
