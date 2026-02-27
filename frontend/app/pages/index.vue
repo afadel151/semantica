@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import KpiCard from '~/components/dashboard/KpiCard.vue';
+import KpiCard from '~/components/KpiCard.vue';
 import LoadedFilesTable from '~/components/dashboard/LoadedFilesTable.vue';
 import type { LoadedFile } from '~/types/loaded_files';
 import NamespaceDistDonut from '~/components/dashboard/NamespaceDistDonut.vue';
@@ -32,27 +32,27 @@ onMounted(() => {
 
 
 const files: LoadedFile[] = [
-  {
-    name: "my-graph.ttl",
-    type: "RDF",
-    format: "Turtle",
-    triples: 1243,
-    uploaded: "today",
-  },
-  {
-    name: "foaf.owl",
-    type: "Ontology",
-    format: "OWL",
-    triples: 89,
-    uploaded: "today",
-  },
-  {
-    name: "schema.rdf",
-    type: "RDF",
-    format: "RDF/XML",
-    triples: 542,
-    uploaded: "yesterday",
-  },
+    {
+        name: "my-graph.ttl",
+        type: "RDF",
+        format: "Turtle",
+        triples: 1243,
+        uploaded: "today",
+    },
+    {
+        name: "foaf.owl",
+        type: "Ontology",
+        format: "OWL",
+        triples: 89,
+        uploaded: "today",
+    },
+    {
+        name: "schema.rdf",
+        type: "RDF",
+        format: "RDF/XML",
+        triples: 542,
+        uploaded: "yesterday",
+    },
 ]
 </script>
 
@@ -71,7 +71,7 @@ const files: LoadedFile[] = [
 
         <!-- ROW 2 — Charts -->
         <div class="grid grid-cols-3 gap-4">
-            
+
             <TripleDistributionPie />
             <TopPredicatesBar />
             <NamespaceDistDonut />
@@ -80,21 +80,21 @@ const files: LoadedFile[] = [
 
         <!-- ROW 3 — Ontology + Reasoning -->
         <div class="grid grid-cols-2 gap-4">
-           <OntologyOverview />
+            <OntologyOverview />
 
             <ReasoningEngine />
         </div>
 
         <!-- ROW 4 — Loaded Files -->
-            
-            <!--replace by shadcn table  -->
-            <LoadedFilesTable :data="files" />
+
+        <!--replace by shadcn table  -->
+        <LoadedFilesTable :data="files" />
 
         <!-- ROW 5 — SPARQL History + Export -->
         <div class="grid grid-cols-2 gap-4">
             <RecentSparql />
 
-           <ExportResults/>
+            <ExportResults />
         </div>
 
     </div>

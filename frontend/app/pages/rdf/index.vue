@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import KpiCard from '~/components/dashboard/KpiCard.vue';
+import KpiCard from '~/components/KpiCard.vue';
+import GraphsTable from '~/components/rdf/GraphsTable.vue';
 import Badge from '~/components/ui/badge/Badge.vue';
 
 
@@ -17,7 +18,7 @@ definePageMeta({
             <KpiCard title="Total triples" data="124" />
             <KpiCard title="Total Size" data="50Mb" />
             <KpiCard title="Formats used">
-                <div class="space-x-2">
+                <div class="space-x-2 space-y-1">
                     <Badge>Turtle</Badge>
                     <Badge>Turtle</Badge>
                     <Badge>Turtle</Badge>
@@ -27,6 +28,10 @@ definePageMeta({
                 </div>
             </KpiCard>
         </div>
+        <div class="w-full">
+            <GraphsTable/>
+        </div>
+        
     </div>
 
 </template>
