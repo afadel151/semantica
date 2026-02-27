@@ -14,28 +14,28 @@ import {
 // Menu items.  
 const items = [
   {
-    title: 'Home',
-    url: '#',
+    title: 'Dashboard',
+    url: '/',
     icon: Home,
   },
   {
-    title: 'Inbox',
-    url: '#',
+    title: 'RDF',
+    url: '/rdf',
     icon: Inbox,
   },
   {
-    title: 'Calendar',
-    url: '#',
+    title: 'Ontology',
+    url: '/ontology',
     icon: Calendar,
   },
   {
-    title: 'Search',
-    url: '#',
+    title: 'SPARQL',
+    url: 'sparql', 
     icon: Search,
   },
   {
-    title: 'Settings',
-    url: '#',
+    title: 'Reasoning',
+    url: 'reasoning',
     icon: Settings,
   },
 ]
