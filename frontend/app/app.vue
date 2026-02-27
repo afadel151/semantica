@@ -18,3 +18,8 @@ onMounted(async () => {
     <NuxtPage />
   </NuxtLayout>
 </template>
+<style>
+:root {
+  font-family: "Poppins";
+}
+</style>
