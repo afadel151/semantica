@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ArrowRight } from 'lucide-vue-next';
+
 
 </script>
 
@@ -30,8 +32,8 @@
                 <CardFooter  class="flex items-center justify-end space-x-2">                    
                     <NuxtLink to="/ontology">
                         <Button variant="secondary">
-
-                            View Hierarchy →
+                            <ArrowRight/>
+                            View Hierarchy 
                         </Button>
                     </NuxtLink>
                 </CardFooter>

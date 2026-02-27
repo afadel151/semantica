@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ArrowRight, CirclePlay } from 'lucide-vue-next';
+
 
 </script>
 
@@ -21,12 +23,14 @@
         </CardContent>
         <CardFooter class="flex items-center justify-end space-x-2">
             <Button>
+                <CirclePlay />
                 Enable Reasoning
             </Button>
             <NuxtLink to="/reasoning">
                 <Button variant="outline">
-
-                    Go to Reasoning →
+                    <ArrowRight/>
+                    Go to Reasoning 
+                    
                 </Button>
             </NuxtLink>
         </CardFooter>
