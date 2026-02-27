@@ -7,7 +7,7 @@ import { useSidebar } from "./utils"
 
 const props = defineProps<{
   class?: HTMLAttributes["class"],
-  title?: string | unknown
+  title?: string | unknown,
 }>()
 
 const { toggleSidebar } = useSidebar()
@@ -28,6 +28,6 @@ const { toggleSidebar } = useSidebar()
     <span class="sr-only">Toggle Sidebar</span>
     
   </Button>
-  <p class="ml-5 font-bold">{{ title }}</p>
+    <p class="text-lg  ml-5 font-bold">{{ title }}</p>
 </div>
 </template>

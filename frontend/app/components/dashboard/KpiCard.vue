@@ -2,16 +2,23 @@
 
 defineProps<{
     title: string,
-    data: string,
+    data?: string,
     footer?: unknown
 }>()
 </script>
 
 
 <template>
-    <Card class=" rounded-xl p-4 shadow-sm border ">
-        <p class="text-xs text-gray-500 font-medium uppercase tracking-wide">{{ title }}</p>
-        <p class="text-2xl font-bold   mt-1" :class=" data === '0' ? 'text-indigo-500':  'text-gray-800  dark:text-gray-100'" >{{ data }}</p>
-        <p class="text-xs text-gray-400 mt-1">{{ footer }}</p>
+    <Card>
+
+        <CardHeader>{{ title }}</CardHeader>
+        <CardContent v-if="data"  :class=" data === '0' ? 'text-indigo-500':  'text-slate-800  dark:text-gray-100'" >
+            <p class="text-3xl font-semibold">{{ data }}</p>
+        </CardContent>
+        <CardContent v-else>
+            <slot />
+        </CardContent>
+        <CardFooter class="text-xs text-gray-400 mt-1">{{ footer }}</CardFooter>
+        
     </Card>
 </template>

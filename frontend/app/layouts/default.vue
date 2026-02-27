@@ -8,7 +8,7 @@ const pageName: string| unknown = route.meta.title
         <AppSidebar />
         <main class="w-full">
             <nav class="flex justify-between items-center p-4 w-full border-b">
-                <SidebarTrigger :title="pageName" />
+                <SidebarTrigger :title="pageName"  />
                 
                 <ModeToggle />
 
