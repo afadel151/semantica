@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import KpiCard from '~/components/KpiCard.vue';
+import OntologiesTable from '~/components/ontology/OntologiesTable.vue';
 
 definePageMeta({
     title: "Ontologies",
@@ -20,5 +21,6 @@ definePageMeta({
                 </div>
             </KpiCard>
         </div>
+        <OntologiesTable/>
     </div>
 </template>
