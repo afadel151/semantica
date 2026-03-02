@@ -30,12 +30,12 @@ const items = [
   },
   {
     title: 'SPARQL',
-    url: 'sparql', 
-    icon: Search,
+    url: '/sparql', 
+    icon: Search, 
   },
   {
     title: 'Reasoning',
-    url: 'reasoning',
+    url: '/reasoning',
     icon: Settings,
   },
 ]
