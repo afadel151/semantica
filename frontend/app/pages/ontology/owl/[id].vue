@@ -18,12 +18,18 @@ function toggleActive()  {
                 <CardTitle>
                     Ontology name (file.owl)
                 </CardTitle>
-                <Badge v-if="isActive" variant="rdf">
-                    Active
-                </Badge>
-                <Button v-else v-on:click="toggleActive()">
-                    Set as active
-                </Button>
+                <div class="space-x-2 flex items-center">
+
+                    <Button size="sm" v-on:click="toggleActive()">
+                        {{ isActive ? 'Set as Inactive' : 'Set as Active' }}
+                    </Button>
+                    <Badge v-if="isActive" variant="active">
+                        Active
+                    </Badge>
+                    <Badge v-else variant="inactive">
+                        Inactive
+                    </Badge>
+                </div>
         </Card>
          <div class="grid grid-cols-5 gap-4">
             <KpiCard title="Classes" data="20" />
