@@ -28,6 +28,6 @@ const { toggleSidebar } = useSidebar()
     <span class="sr-only">Toggle Sidebar</span>
     
   </Button>
-    <p class="text-lg  ml-5 font-bold">{{ title }}</p>
+    <!-- <p class="text-lg  ml-5 font-bold">{{ title }}</p>  -->
 </div>
 </template>

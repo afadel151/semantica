@@ -25,7 +25,7 @@ export const badgeVariants = cva(
         ask:
           "border-transparent bg-indigo-200 text-gray-800 dark:bg-secondary dark:text-indigo-200",
         construct:
-          "border-transparent bg-red-200 text-gray-800 dark:bg-secondary dark:text-red-200",
+          "border-transparent bg-orange-200 text-gray-800 dark:bg-secondary dark:text-orange-200",
         describe:
           "border-transparent bg-yellow-200 text-gray-600 dark:bg-secondary dark:text-yellow-200",
         active:

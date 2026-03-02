@@ -1,97 +1,59 @@
 <script setup lang="ts">
-import type {
-  ChartConfig,
-} from "@/components/ui/chart"
 
-import { VisAxis, VisGroupedBar, VisXYContainer } from "@unovis/vue"
+import { Bar } from 'vue-chartjs'
+import { Chart as ChartJS, Title, Tooltip, Legend, BarElement, CategoryScale, LinearScale, RadialLinearScale, ArcElement } from 'chart.js'
+ChartJS.register(Title, Tooltip, Legend, BarElement, CategoryScale,RadialLinearScale,ArcElement, LinearScale)
+
 import { TrendingUp } from "lucide-vue-next"
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  ChartContainer,
-  ChartCrosshair,
-  ChartTooltip,
-  ChartTooltipContent,
-  componentToString,
-} from "@/components/ui/chart"
 
-const description = "A line chart"
 
-const chartData = [
-  { date: new Date("2024-01-01"), desktop: 186 },
-  { date: new Date("2024-02-01"), desktop: 305 },
-  { date: new Date("2024-03-01"), desktop: 237 },
-  { date: new Date("2024-04-01"), desktop: 73 },
-  { date: new Date("2024-05-01"), desktop: 209 },
-  { date: new Date("2024-06-01"), desktop: 214 },
-]
+const chartData = {
+  labels: ['Subjects', 'Predicates', 'Objects'],
+  datasets: [
+    {
+      label: 'Visitors',
+      data: [4300, 3800, 2400],
+      borderColor: '#fff',
+      borderWidth:0,
+      backgroundColor: [
+        '#ff2159',
+        '#1549e6',
+        '#ff9900',
+      ],
+    },
+  ],
+}
+const chartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
 
-type Data = typeof chartData[number]
+  cutout: '65%', // 🔥 controls inner hole size (default ~50%)
 
-const chartConfig = {
-  desktop: {
-    label: "Desktop",
-    color: "var(--chart-1)",
+  plugins: {
+    legend: {
+      display: false, // remove legend
+    },
+    tooltip: {
+      enabled: true,
+    },
   },
-} satisfies ChartConfig
+}
+
+
 </script>
 
 <template>
-  <Card class="flex flex-col h-full">
-    <CardHeader>
+  <Card class="flex flex-col">
+    <CardHeader class="items-center pb-0">
       <CardTitle>Top Predicates</CardTitle>
     </CardHeader>
-    <CardContent class="flex-1">
-      <ChartContainer :config="chartConfig" class="h-full w-full">
-        <VisXYContainer
-         class="h-full w-full"
-          :data="chartData"
-          :margin="{ left: -24 }"
-          :y-domain="[0, undefined]"
-        >
-          <VisGroupedBar
-            :x="(d: Data) => d.date"
-            :y="(d: Data) => d.desktop"
-            :color="chartConfig.desktop.color"
-            :rounded-corners="10"
-          />
-          <VisAxis
-            type="x"
-            :x="(d: Data) => d.date"
-            :tick-line="false"
-            :domain-line="false"
-            :grid-line="false"
-            :num-ticks="6"
-            :tick-format="(d: number) => {
-              const date = new Date(d)
-              return date.toLocaleDateString('en-US', {
-                month: 'short',
-              })
-            }"
-            :tick-values="chartData.map(d => d.date)"
-          />
-          <VisAxis
-            type="y"
-            :num-ticks="3"
-            :tick-line="false"
-            :domain-line="false"
-          />
-          <ChartTooltip />
-          <ChartCrosshair
-            :template="componentToString(chartConfig, ChartTooltipContent, { hideLabel: true })"
-            color="#0000"
-          />
-        </VisXYContainer>
-      </ChartContainer>
+    <CardContent class="flex-1 pb-0">
+      <Bar :options="chartOptions" :data="chartData" />
     </CardContent>
-    <CardFooter class="flex-col items-start gap-2 text-sm">
-      <div class="flex gap-2 font-medium leading-none">
-        Trending up by 5.2% this month <TrendingUp class="h-4 w-4" />
+    <CardFooter class="flex-col gap-2 text-sm">
+      <div class="flex items-center gap-2 font-medium leading-none">
+        Trending up by 5.2% this month
+        <TrendingUp class="h-4 w-4" />
       </div>
       <div class="leading-none text-muted-foreground">
         Showing total visitors for the last 6 months
