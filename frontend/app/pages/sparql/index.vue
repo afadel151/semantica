@@ -8,6 +8,7 @@ import RightPanel from '~/components/sparql/RightPanel.vue';
 definePageMeta({
     title: "SPARQL Editor",
 })
+    
 </script>
 
 <template>  
