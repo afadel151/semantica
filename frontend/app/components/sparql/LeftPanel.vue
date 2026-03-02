@@ -15,6 +15,8 @@ WHERE {
   ?subject ?predicate ?object
 }
 LIMIT 25`)
+
+
 // query, query_type, graph_name, ontoligies(names), executed_at
 const history = ref([
   {
@@ -105,7 +107,7 @@ function loadFromHistory(h) { query.value = h.query }
               <TableCell>
                 <Badge :variant="mapQueryToVariant(query.query_type)">{{ query.query_type }}</Badge>
               </TableCell>
-              <TableCell class="max-w-[300px] truncate">
+              <TableCell class="max-w-75 truncate">
                 {{ query.query }}
               </TableCell>
               <TableCell class="flex justify-end ">
