@@ -9,7 +9,6 @@ const results = ref({
     elements: [
 
 
-    
         { data: { id: 'ex:John',         label: 'John',         type: 'uri'     } },
         { data: { id: 'ex:Jane',         label: 'Jane',         type: 'uri'     } },
         { data: { id: 'ex:ACME',         label: 'ACME Corp',    type: 'uri'     } },
@@ -175,7 +174,7 @@ watch(
             <!-- CONSTRUCT → Mini Cytoscape Graph -->
             <div v-if="results?.type === 'CONSTRUCT' && !running" class="h-full flex flex-col gap-2">
                 <p class="text-xs text-gray-400">{{ results.triple_count }} triples constructed</p>
-                <div ref="constructGraph" class="flex-1 rounded-xl border  bg-gray-50"></div>
+                <div ref="constructGraph" class="flex-1 rounded-xl border  "></div>
             </div>
 
         </CardContent>

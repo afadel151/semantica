@@ -99,8 +99,8 @@ const formalismColor: Record<string, string> = {
             <div class="grid grid-cols-4 gap-3">
                 <Card
                     v-for="f in formalisms" :key="f.value"
-                    class="p-4 cursor-pointer transition-all border-2"
-                    :class="formalism === f.value ? 'border-primary' : 'border-transparent'"
+                    class="p-4 cursor-pointer transition-all "
+                    :class="formalism === f.value ? 'border-primary' : 'border-transparent hover:border-secondary   '"
                     @click="formalism = f.value"
                 >
                     <div class="flex items-center justify-between mb-2">
