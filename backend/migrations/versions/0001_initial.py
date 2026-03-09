@@ -130,6 +130,7 @@ def upgrade() -> None:
         sa.Column("label",       sa.String(),  nullable=True),
         sa.Column("prefix_form", sa.String(),  nullable=True),
         sa.Column("rdf_type",    sa.String(),  nullable=True),
+        sa.Column("property_count",    sa.Integer(),  nullable=True),
     )
 
     op.create_table(
