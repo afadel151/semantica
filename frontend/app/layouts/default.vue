@@ -1,5 +1,7 @@
 <script setup lang="ts">
 const route = useRoute()
+import 'vue-sonner/style.css'
+import { Toaster } from '@/components/ui/sonner'
 const pageName: string| unknown = route.meta.title
 </script>
 
@@ -15,5 +17,6 @@ const pageName: string| unknown = route.meta.title
             <!-- </nav> -->
             <slot />    
         </main> 
+            <Toaster position="top-right" richColors />
     </SidebarProvider>
 </template>
