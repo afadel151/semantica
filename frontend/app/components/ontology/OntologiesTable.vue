@@ -10,33 +10,12 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { CirclePlus, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, ChartNoAxesColumn, Eye, Trash } from 'lucide-vue-next'
+import LoadOntology from './LoadOntology.vue'
+import DeleteOntology from './DeleteOntology.vue'
 
 const props = defineProps({
     ontologies: {
         type: Array,
-        default: () => [
-            {
-                id: '1',
-                name: 'ontolody.owl',
-                format: 'OWL',
-                classes: '32',
-                properties: '50',
-                individuals: '50',
-                uploaded: '20-02-2026',
-                status: 'active'
-            },
-            {
-                id: 'id2',
-                name: 'ontolody.rdfs',
-                format: 'RDFS',
-                classes: '32',
-                properties: '50',
-                individuals: '50',
-                uploaded: '21-02-2026',
-                status: 'inactive'
-            },
-
-        ]
     }
 })
 
@@ -47,11 +26,10 @@ const sortOrder = ref('asc')
 const columns = [
     { key: 'name', label: 'Name' },
     { key: 'format', label: 'Format' },
-    { key: 'classes', label: 'Classes' },
-    { key: 'properties', label: 'Properties' },
-    { key: 'individuals', label: 'Individuals' },
-    { key: 'uploaded', label: 'Uploaded' },
-    { key: 'status', label: 'Status' },
+    { key: 'classes_count', label: 'Classes' },
+    { key: 'properties_count', label: 'Properties' },
+    { key: 'individuals_count', label: 'Individuals' },
+    { key: 'uploaded_at', label: 'Uploaded' },
 ]
 const filteredColumns = computed(() =>
     columns.filter(col => col.key !== 'status')
@@ -65,7 +43,7 @@ function toggleSort(key) {
     }
     currentPage.value = 1
 }
-
+const emit = defineEmits(['refresh'])
 const sortedOntologies = computed(() => {
     if (!sortKey.value) return props.ontologies
 
@@ -114,20 +92,34 @@ const visiblePages = computed(() => {
     }
     return pages
 })
+
+const handleUploaded = () => {
+    toast.success('File has been uploaded')
+    emit('refresh')
+}
+
+const handleDeleted = () => {
+    toast.warning('Ontolody deleted successfully')
+    emit('refresh')
+}
+const handleError = () => {
+
+    toast.error('File has not been uploaded', {
+        description: 'an unexpected error has occured',
+    })
+}
+
 </script>
 
 <template>
     <div class="rounded-xl p-4 shadow-sm border">
         <div class="flex items-center justify-between mb-3">
             <p class="text-sm font-semibold text-gray-700 dark:text-gray-100">All Ontologies</p>
-            <Button>
-                <CirclePlus class="mr-1.5 h-4 w-4" />
-                Load Ontology
-            </Button>
+            <LoadOntology @uploaded="handleUploaded" @error="handleError" />
         </div>
 
         <Table>
-            <TableCaption>A list of your recent RDF files.</TableCaption>
+            <TableCaption>A list of your recent ontology files.</TableCaption>
             <TableHeader>
                 <TableRow>
                     <TableHead v-for="col in columns" :key="col.key"
@@ -154,11 +146,6 @@ const visiblePages = computed(() => {
                         <TableCell v-for="col in filteredColumns" :key="col.key">
                             {{ ontology[col.key] ?? '—' }}
                         </TableCell>
-                        <TableCell>
-                            <Badge :variant="ontology.status === 'active' ? 'select' : 'destructive'">
-                                {{ ontology.status }}
-                            </Badge>
-                        </TableCell>
                     <TableCell class="text-right  space-x-2 justify-end">
                         <NuxtLink :to="ontology.format === 'OWL' ? `/ontology/owl/${ontology.id}` : `/ontology/rdfs/${ontology.id}`">
                             <Button>
@@ -166,10 +153,7 @@ const visiblePages = computed(() => {
                                 Show
                             </Button>
                         </NuxtLink>
-                        <Button variant="destructive">
-                            <Trash />
-                            Delete
-                        </Button>
+                        <DeleteOntology @deleted="handleDeleted" :onto_id="ontology.id" />
                     </TableCell>
                 </TableRow>
             </TableBody>
