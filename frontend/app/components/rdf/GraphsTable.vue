@@ -9,7 +9,12 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
-import { CirclePlus, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, ChartNoAxesColumn, Eye, Trash } from 'lucide-vue-next'
+import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Eye, RefreshCcw } from 'lucide-vue-next'
+import DeleteGraph from './DeleteGraph.vue'
+import LoadGraph from './LoadGraph.vue'
+import { toast } from 'vue-sonner'
+
+const emit = defineEmits(['refresh'])
 
 const props = defineProps({
     graphs: {
@@ -20,15 +25,14 @@ const props = defineProps({
 
 // sort
 const sortKey = ref(null)
-const sortOrder = ref('asc') 
+const sortOrder = ref('asc')
 
 const columns = [
-    { key: 'name',      label: 'Name' },
-    { key: 'format',    label: 'Format' },
-    { key: 'triples_count',   label: 'Triples' },
-    { key: 'file_size',      label: 'Size (Kb)' },
-    { key: 'uploaded_at',  label: 'Uploaded' },
-    { key: 'status',    label: 'Status' },
+    { key: 'name', label: 'Name' },
+    { key: 'format', label: 'Format' },
+    { key: 'triples_count', label: 'Triples' },
+    { key: 'file_size', label: 'Size (Kb)' },
+    { key: 'uploaded_at', label: 'Uploaded' },
 ]
 const filteredColumns = computed(() =>
     columns.filter(col => col.key !== 'status')
@@ -91,42 +95,46 @@ const visiblePages = computed(() => {
     }
     return pages
 })
+
+const handleUploaded = () => {
+    toast.success('File has been uploaded')
+    emit('refresh')
+}
+
+const handleError = () => {
+
+    toast.error('File has not been uploaded', {
+        description: 'an unexpected error has occured',
+    })
+}
 </script>
 
 <template>
     <div class="rounded-xl p-4 shadow-sm border">
         <div class="flex items-center justify-between mb-3">
             <p class="text-sm font-semibold text-gray-700 dark:text-gray-100">All Graphs</p>
-            <Button>
-                <CirclePlus class="mr-1.5 h-4 w-4" />
-                Load RDF Graph
-            </Button>
+            <div class="flex space-x-2 items-center">
+                <LoadGraph @uploaded="handleUploaded" @error="handleError" />
+                <Button variant="outline" @click="()=> emit('refresh')"> 
+                    <RefreshCcw />
+                    Refresh
+                </Button>
+            </div>
         </div>
 
         <Table>
             <TableCaption>A list of your recent RDF files.</TableCaption>
             <TableHeader>
                 <TableRow>
-                    <TableHead
-                        v-for="col in columns"
-                        :key="col.key"
-                        class="cursor-pointer select-none whitespace-nowrap"
-                        @click="toggleSort(col.key)"
-                    >
+                    <TableHead v-for="col in columns" :key="col.key"
+                        class="cursor-pointer select-none whitespace-nowrap" @click="toggleSort(col.key)">
                         <span class="inline-flex items-center gap-1">
                             {{ col.label }}
-                            <ChevronUp
-                                v-if="sortKey === col.key && sortOrder === 'asc'"
-                                class="h-3.5 w-3.5 text-primary"
-                            />
-                            <ChevronDown
-                                v-else-if="sortKey === col.key && sortOrder === 'desc'"
-                                class="h-3.5 w-3.5 text-primary"
-                            />
-                            <ChevronsUpDown
-                                v-else
-                                class="h-3.5 w-3.5 text-muted-foreground opacity-50"
-                            />
+                            <ChevronUp v-if="sortKey === col.key && sortOrder === 'asc'"
+                                class="h-3.5 w-3.5 text-primary" />
+                            <ChevronDown v-else-if="sortKey === col.key && sortOrder === 'desc'"
+                                class="h-3.5 w-3.5 text-primary" />
+                            <ChevronsUpDown v-else class="h-3.5 w-3.5 text-muted-foreground opacity-50" />
                         </span>
                     </TableHead>
                     <TableHead class="text-right">Actions</TableHead>
@@ -142,26 +150,15 @@ const visiblePages = computed(() => {
                     <TableCell v-for="col in filteredColumns" :key="col.key">
                         {{ graph[col.key] ?? '—' }}
                     </TableCell>
-                    <TableCell>
-                        <Badge :variant="graph.status === 'active' ? 'select' : 'destructive'">
-                            {{ graph.status }}
-                        </Badge>
-                    </TableCell>
+
                     <TableCell class="text-right  space-x-2 justify-end">
-                        <NuxtLink :to="'/rdf/'+ graph.id">
+                        <NuxtLink :to="'/rdf/' + graph.id">
                             <Button>
                                 <Eye />
                                 Show
                             </Button>
                         </NuxtLink>
-                         <Button variant="secondary">
-                            <ChartNoAxesColumn/>
-                            Statistics
-                        </Button>
-                        <Button variant="destructive">
-                            <Trash/>
-                            Delete
-                        </Button>
+                        <DeleteGraph :graph_id="graph['id']" @deleted="emit('refresh')" />
                     </TableCell>
                 </TableRow>
             </TableBody>
@@ -170,18 +167,16 @@ const visiblePages = computed(() => {
         <div class="flex items-center justify-between mt-3 gap-2 flex-wrap">
             <div class="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>Rows per page</span>
-                <select
-                    :value="pageSize"
-                    class="rounded border px-2 py-1 text-sm bg-background"
-                    @change="onPageSizeChange"
-                >
+                <select :value="pageSize" class="rounded border px-2 py-1 text-sm bg-background"
+                    @change="onPageSizeChange">
                     <option v-for="n in pageSizeOptions" :key="n" :value="n">{{ n }}</option>
                 </select>
             </div>
 
             <div class="flex items-center gap-1 text-sm">
                 <span class="text-muted-foreground mr-2">
-                    {{ sortedGraphs.length === 0 ? '0' : (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage * pageSize, sortedGraphs.length) }}
+                    {{ sortedGraphs.length === 0 ? '0' : (currentPage - 1) * pageSize + 1 }}–{{ Math.min(currentPage *
+                        pageSize, sortedGraphs.length) }}
                     of {{ sortedGraphs.length }}
                 </span>
 
@@ -194,22 +189,19 @@ const visiblePages = computed(() => {
                     <span v-if="visiblePages[0] > 2" class="px-1 text-muted-foreground">…</span>
                 </template>
 
-                <Button
-                    v-for="page in visiblePages"
-                    :key="page"
-                    :variant="page === currentPage ? 'secondary' : 'outline'"
-                    size="icon"
-                    @click="goToPage(page)"
-                >
+                <Button v-for="page in visiblePages" :key="page"
+                    :variant="page === currentPage ? 'secondary' : 'outline'" size="icon" @click="goToPage(page)">
                     {{ page }}
                 </Button>
 
                 <template v-if="visiblePages[visiblePages.length - 1] < totalPages">
-                    <span v-if="visiblePages[visiblePages.length - 1] < totalPages - 1" class="px-1 text-muted-foreground">…</span>
+                    <span v-if="visiblePages[visiblePages.length - 1] < totalPages - 1"
+                        class="px-1 text-muted-foreground">…</span>
                     <Button variant="outline" size="icon" @click="goToPage(totalPages)">{{ totalPages }}</Button>
                 </template>
 
-                <Button variant="outline" size="icon" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">
+                <Button variant="outline" size="icon" :disabled="currentPage === totalPages"
+                    @click="goToPage(currentPage + 1)">
                     <ChevronRight class="h-4 w-4" />
                 </Button>
             </div>
