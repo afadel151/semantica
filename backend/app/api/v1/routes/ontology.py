@@ -7,7 +7,7 @@ import rdflib
 from rdflib import RDF, RDFS, OWL
 from rdflib.term import BNode, Literal
 
-from app.core.db import get_session
+from app.core.db import get_session 
 from app.models.ontology import Ontology, Class, Property, Individual
 from app.api.v1.helpers.rdf import safe_label, safe_qname, _detect_rdf_format
 from app.api.v1.helpers.ontology import _compute_ontology_details, _detect_ontology_type
@@ -146,7 +146,6 @@ def delete_file(onto_id: uuid.UUID, session: Session = Depends(get_session)):
 # ─────────────────────────────────────────
 # OWL DETAIL  →  used by /owl/[id].vue
 # ─────────────────────────────────────────
-
 @router.get("/{onto_id}/owl")
 def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
     onto = session.get(Ontology, onto_id)
@@ -155,7 +154,6 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
     if onto.format != "owl":
         raise HTTPException(status_code=400, detail="This ontology is not OWL.")
 
-    # Load from disk for rich details not stored in DB
     g = rdflib.Graph()
     g.parse(onto.file_path)
 
@@ -163,7 +161,7 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
         select(Class).where(Class.ontology_id == onto_id)
     ).all()
 
-    obj_props  = session.exec(
+    obj_props = session.exec(
         select(Property)
         .where(Property.ontology_id == onto_id)
         .where(Property.type == "owl:ObjectProperty")
@@ -179,12 +177,35 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
         select(Individual).where(Individual.ontology_id == onto_id)
     ).all()
 
-    # Build per-class detail (OWL-specific fields from rdflib)
-    classes_out = []
+    nodes = []
+    edges = []
+
+    # Add owl:Thing as root node (virtual — not stored in DB)
+    root_uri = str(OWL.Thing)
+    nodes.append({
+        "id": "owl:Thing",
+        "label": "owl:Thing",
+        "type": "root",
+        "comment": None,
+        "equivalent_classes": [],
+        "disjoint_classes": [],
+        "union_of": [],
+        "intersection_of": [],
+        "object_properties": [],
+        "data_properties": [],
+        "restrictions": [],
+        "individuals": [],
+        "individual_count": 0,
+    })
+
+    class_ids = set()  # track emitted node IDs to avoid duplicates
+
     for cls_db in classes_db:
         cls_uri = rdflib.URIRef(cls_db.uri)
+        node_id = cls_db.prefix_form or safe_qname(g, cls_uri)
+        class_ids.add(node_id)
 
-        # OWL-specific — read live from file
+        # OWL-specific relations
         equivalents = [
             safe_qname(g, e) for e in g.objects(cls_uri, OWL.equivalentClass)
             if not isinstance(e, BNode)
@@ -195,26 +216,25 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
         ]
 
         union_node = g.value(cls_uri, OWL.unionOf)
-        union_of   = [safe_qname(g, i) for i in g.items(union_node) if not isinstance(i, BNode)] if union_node else []
+        union_of = [safe_qname(g, i) for i in g.items(union_node) if not isinstance(i, BNode)] if union_node else []
 
-        inter_node      = g.value(cls_uri, OWL.intersectionOf)
+        inter_node = g.value(cls_uri, OWL.intersectionOf)
         intersection_of = [safe_qname(g, i) for i in g.items(inter_node) if not isinstance(i, BNode)] if inter_node else []
 
         # Restrictions
         restrictions = []
         for superclass in g.objects(cls_uri, RDFS.subClassOf):
             if (superclass, RDF.type, OWL.Restriction) in g:
-                prop     = g.value(superclass, OWL.onProperty)
+                prop = g.value(superclass, OWL.onProperty)
                 restrictions.append({
-                    "property":          safe_qname(g, prop) if prop else None,
-                    "min_cardinality":   int(v) if (v := g.value(superclass, OWL.minCardinality)) else None,
-                    "max_cardinality":   int(v) if (v := g.value(superclass, OWL.maxCardinality)) else None,
-                    "exact_cardinality": int(v) if (v := g.value(superclass, OWL.cardinality))    else None,
-                    "some_values_from":  safe_qname(g, sv) if (sv := g.value(superclass, OWL.someValuesFrom)) and not isinstance(sv, BNode) else None,
-                    "all_values_from":   safe_qname(g, av) if (av := g.value(superclass, OWL.allValuesFrom))  and not isinstance(av, BNode) else None,
+                    "property": safe_qname(g, prop) if prop else None,
+                    "min_cardinality": int(v) if (v := g.value(superclass, OWL.minCardinality)) else None,
+                    "max_cardinality": int(v) if (v := g.value(superclass, OWL.maxCardinality)) else None,
+                    "exact_cardinality": int(v) if (v := g.value(superclass, OWL.cardinality)) else None,
+                    "some_values_from": safe_qname(g, sv) if (sv := g.value(superclass, OWL.someValuesFrom)) and not isinstance(sv, BNode) else None,
+                    "all_values_from": safe_qname(g, av) if (av := g.value(superclass, OWL.allValuesFrom)) and not isinstance(av, BNode) else None,
                 })
 
-        # Properties scoped to this class (domain = cls)
         cls_obj_props = [
             {"label": p.label, "range": p.range}
             for p in obj_props if p.domain == cls_db.prefix_form
@@ -223,47 +243,69 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
             {"label": p.label, "range": p.range}
             for p in data_props if p.domain == cls_db.prefix_form
         ]
-
-        # Individuals of this class
         cls_individuals = [
             {"uri": i.uri, "label": i.label}
             for i in individuals if i.rdf_type == cls_db.prefix_form
         ]
-
         comment = g.value(cls_uri, RDFS.comment)
 
-        classes_out.append({
-            "uri":               cls_db.uri,
-            "label":             cls_db.label,
-            "prefix_form":       cls_db.prefix_form,
-            "comment":           str(comment) if comment else None,
-            "parents":           [cls_db.parent_uri] if cls_db.parent_uri else [],
-            "children":          [
-                safe_qname(g, c) for c in g.subjects(RDFS.subClassOf, cls_uri)
-                if not isinstance(c, BNode)
-            ],
+        nodes.append({
+            "id": node_id,
+            "label": cls_db.label or node_id,
+            "type": "class",
+            "comment": str(comment) if comment else None,
             "equivalent_classes": equivalents,
-            "disjoint_classes":   disjoints,
-            "union_of":           union_of,
-            "intersection_of":    intersection_of,
-            "restrictions":       restrictions,
-            "object_properties":  cls_obj_props,
-            "data_properties":    cls_data_props,
-            "individuals":        cls_individuals,
-            "individual_count":   len(cls_individuals),
+            "disjoint_classes": disjoints,
+            "union_of": union_of,
+            "intersection_of": intersection_of,
+            "object_properties": cls_obj_props,
+            "data_properties": cls_data_props,
+            "restrictions": restrictions,
+            "individuals": cls_individuals,
+            "individual_count": len(cls_individuals),
         })
 
-    return {
-        "id":                     str(onto.id),
-        "name":                   onto.name,
-        "format":                 onto.format,
-        "class_count":            onto.classes_count,
-        "object_property_count":  len(obj_props),
-        "data_property_count":    len(data_props),
-        "individual_count":       onto.individuals_count,
-        "classes":                classes_out,
-    }
+        # ── Edges ────────────────────────────────────────────────────────────
+        # subClassOf edges (excluding restriction BNodes)
+        parents = [
+            p for p in g.objects(cls_uri, RDFS.subClassOf)
+            if not isinstance(p, BNode)
+        ]
+        if parents:
+            for parent in parents:
+                parent_id = safe_qname(g, parent)
+                edges.append({
+                    "source": node_id,
+                    "target": parent_id,
+                    "type": "subClassOf",
+                })
+        else:
+            # No explicit parent → connect to owl:Thing
+            edges.append({
+                "source": node_id,
+                "target": "owl:Thing",
+                "type": "subClassOf",
+            })
 
+        # equivalentClass edges (undirected, emit once per pair)
+        for eq in equivalents:
+            edges.append({"source": node_id, "target": eq, "type": "equivalentClass"})
+
+        # disjointWith edges
+        for dj in disjoints:
+            edges.append({"source": node_id, "target": dj, "type": "disjointWith"})
+
+    return {
+        "id": str(onto.id),
+        "name": onto.name,
+        "format": onto.format,
+        "class_count": onto.classes_count,
+        "object_property_count": len(obj_props),
+        "data_property_count": len(data_props),
+        "individual_count": onto.individuals_count,
+        "nodes": nodes,
+        "edges": edges,
+    }
 
 # ─────────────────────────────────────────
 # RDFS DETAIL  →  used by /rdfs/[id].vue
