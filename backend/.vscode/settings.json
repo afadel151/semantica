@@ -2,4 +2,5 @@
     "editor.bracketPairColorization.enabled": false,
     "python.REPL.enableREPLSmartSend": false,
     "files.autoSave": "afterDelay",
+    "workbench.colorTheme": "GitHub Dark"
 }
