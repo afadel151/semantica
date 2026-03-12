@@ -6,44 +6,18 @@ import { defaultKeymap } from '@codemirror/commands'
 import { ArrowUpToLine, Eraser, Play } from 'lucide-vue-next'
 import { mapQueryToVariant } from '~/types/badge_variant';  
 import { sparql } from 'codemirror-lang-sparql';
+import { useSparqlState, useSparqlActions } from '~/composables/useSparql';
 
+// State from the composable
+const { query, history, activeGraphId } = useSparqlState();
 
+// Actions from the composable
+const { runQuery, clearState, loadFromHistory, fetchHistory, initDefaultGraph } = useSparqlActions();
 
-
-const query = ref(`SELECT ?subject ?predicate ?object
-WHERE {
-  ?subject ?predicate ?object
-}
-LIMIT 25`)
-
-
-// query, query_type, graph_name, ontoligies(names), executed_at
-const history = ref([
-  {
-    query: `SELECT ?s ?p ?o WHERE { ?s ?p ?o } LIMIT 10`,
-    query_type: 'SELECT',
-    graph_name: 'default',
-    ontologies: ['ontology1.owl', 'ontology2.owl'],
-    executed_at: '2024-06-20 14:30:00',
-    row_count: 10,
-  },
-  {
-    query: `ASK { ?s a <http://example.com/SomeClass> }`,
-    query_type: 'ASK',
-    graph_name: 'default',
-    ontologies: ['ontology1.owl'],
-    executed_at: '2024-06-19 10:15:00',
-    result: true,
-  },
-  {
-    query: `CONSTRUCT { ?s a <http://example.com/SomeClass> } WHERE { ?s a <http://example.com/SomeClass> }`,
-    query_type: 'CONSTRUCT',
-    graph_name: 'default',
-    ontologies: ['ontology1.owl'],
-    executed_at: '2024-06-19 10:15:00',
-    row_count: 5,
-  }
-])
+onMounted(async () => {
+    await initDefaultGraph();
+    await fetchHistory();
+});
 
 const extensions = [
   sparql(),
@@ -52,6 +26,7 @@ const extensions = [
     { key: 'Ctrl-Enter', run: () => { runQuery(); return true } }
   ])
 ]
+
 const detectedType = computed(() => {
   if (!query.value) return null
 
@@ -64,9 +39,7 @@ const detectedType = computed(() => {
   return match ? match[1].toUpperCase() : null
 })
 
-function clearEditor() { query.value = ''; results.value = null; error.value = null }
-function loadFromHistory(h) { query.value = h.query }
-
+function clearEditor() { clearState(); }
 </script>
 
 <template>
@@ -88,7 +61,7 @@ function loadFromHistory(h) { query.value = h.query }
           <Button @click="clearEditor" variant="outline" size="sm">
             <Eraser class="w-3 h-3 mr-1" /> Clear
           </Button>
-          <Button   size="sm">
+          <Button @click="runQuery" size="sm">
             <Play class="w-3 h-3 mr-1" /> Run
           </Button>
         </div>
@@ -106,17 +79,16 @@ function loadFromHistory(h) { query.value = h.query }
       <CardContent>
         <Table>
           <TableBody>
-            <TableRow v-for="query in history" :key="query.query">
+            <TableRow v-for="h in history.slice(0,3)" :key="h.id || h.query">
               <TableCell>
-                <Badge :variant="mapQueryToVariant(query.query_type)">{{ query.query_type }}</Badge>
+                <Badge :variant="mapQueryToVariant(h.query_type)">{{ h.query_type }}</Badge>
               </TableCell>
-              <TableCell class="max-w-75 truncate">
-                {{ query.query }}
+              <TableCell class="max-w-75 truncate" :title="h.query">
+                {{ h.query }}
               </TableCell>
-              <TableCell class="flex justify-end ">
-                <Button variant="outline" @click="loadFromHistory(query)">
-                  <ArrowUpToLine />
-                  Load
+              <TableCell class="flex justify-end gap-2">
+                <Button variant="outline" @click="loadFromHistory(h)" size="sm">
+                  <ArrowUpToLine class="w-4 h-4 mr-1" /> Load
                 </Button>
               </TableCell>
             </TableRow>

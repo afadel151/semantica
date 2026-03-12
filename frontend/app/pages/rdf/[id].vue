@@ -5,11 +5,13 @@ import KpiCard from '~/components/KpiCard.vue'
 import ObjectsTable from '~/components/rdf/ObjectsTable.vue'
 import PredicatesTable from '~/components/rdf/PredicatesTable.vue'
 import SubjectsTable from '~/components/rdf/SubjectsTable.vue'
+import { useActiveGraphStore } from '~/store/active_graph'
 import type { GraphFileStats, GraphElements } from '~/types/rdf'
 
 const config = useRuntimeConfig()
 
 const route = useRoute()
+const activeGraphState = useActiveGraphStore()
 const stats = ref<GraphFileStats>({
     name: '',
     format: '',
@@ -65,15 +67,25 @@ onMounted(() => {
 definePageMeta({
     title: "Graph details",
 })
-const isActive = ref(false)
-function toggleActive() {
-    isActive.value = !isActive.value
-    console.log(isActive.value);
-}
 
+
+const isActive = ref(false)
 function getFormattedDate(dateTimeStr: string): string {
     const date = new Date(dateTimeStr);
     return date.toLocaleDateString('fr-FR'); // French format
+}
+function toggleActive() { 
+    if (isActive.value) {
+        activeGraphState.clearGraph();
+        isActive.value = false
+    }else{
+        activeGraphState.setGraph({
+            id: stats?.value.graph_id,
+            name: stats?.value.name,
+        })
+        isActive.value = true
+    }
+
 }
 </script>
 
@@ -82,14 +94,14 @@ function getFormattedDate(dateTimeStr: string): string {
         <Card class="flex flex-row px-5  justify-between items-center">
             <CardHeader class="w-fit">
                 <p class="text-2xl   ">
-                    {{ stats.name || 'undefined name' }}.{{ stats.format || 'undefined format' }}
+                    {{ stats?.name || 'undefined name' }}.{{ stats?.format || 'undefined format' }}
                 </p>
                 <CardDescription class="w-fit">
-                    {{ getFormattedDate(stats.uploaded_at || 'unknown') }}
+                    {{ getFormattedDate(stats?.uploaded_at || 'unknown') }}
                 </CardDescription>
             </CardHeader>
             <div class="space-x-2 flex items-center">
-                <NuxtLink :to="'/visualise/graph/'+ stats.graph_id">
+                <NuxtLink :to="'/visualise/graph/'+ stats?.graph_id">
                     <Button size="sm" variant="outline">
                         <Waypoints />
                         Visualise
@@ -106,10 +118,10 @@ function getFormattedDate(dateTimeStr: string): string {
                 </Badge>
             </div>
         </Card>
-        <div class="grid grid-cols-3 gap-4">
-            <KpiCard title="Subjects" :data="stats.subjects_count ?? 0" />
-            <KpiCard title="Predicates" :data="stats.predicates_count ?? 0" />
-            <KpiCard title="Objects" :data="stats.objects_count ?? 0" />
+        <div class="grid grid-cols-3 gap-4">    
+            <KpiCard title="Subjects" :data="stats?.subjects_count ?? 0" />
+            <KpiCard title="Predicates" :data="stats?.predicates_count ?? 0" />
+            <KpiCard title="Objects" :data="stats?.objects_count ?? 0" />
 
         </div>
         <div class="flex w-full flex-col  gap-6">

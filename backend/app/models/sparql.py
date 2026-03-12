@@ -23,3 +23,6 @@ class SparqlHistory(SQLModel, table=True):
     ontologies: List["Ontology"] = Relationship(back_populates="sparql_queries", link_model=QueryOntology)
 
 
+class SparqlQueryRequest(SQLModel):
+    query: str
+    graph_id: uuid.UUID

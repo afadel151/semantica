@@ -1,33 +1,13 @@
 <script setup>
 import { Download, Settings } from 'lucide-vue-next';
+import { useSparqlState, useSparqlActions } from '~/composables/useSparql';
 
-// Replace your results ref with this
-const results = ref({
-    type: 'CONSTRUCT',
-    triple_count: 8,
-    execution_time: 243,
-    elements: [
-        { data: { id: 'ex:John',         label: 'John',         type: 'uri'     } },
-        { data: { id: 'ex:Jane',         label: 'Jane',         type: 'uri'     } },
-        { data: { id: 'ex:ACME',         label: 'ACME Corp',    type: 'uri'     } },
-        { data: { id: 'foaf:Person',     label: 'Person',       type: 'uri'     } },
-        { data: { id: 'foaf:Organization', label: 'Organization', type: 'uri'   } },
-        { data: { id: '"John Doe"',      label: 'John Doe',     type: 'literal' } },
-        { data: { id: '"30"',            label: '30',           type: 'literal' } },
+const { results, error, isRunning: running } = useSparqlState();
+const { exportResultsFormat } = useSparqlActions();
 
-        { data: { source: 'ex:John',  target: 'foaf:Person',      label: 'rdf:type'   } },
-        { data: { source: 'ex:Jane',  target: 'foaf:Person',      label: 'rdf:type'   } },
-        { data: { source: 'ex:ACME',  target: 'foaf:Organization', label: 'rdf:type'  } },
-        { data: { source: 'ex:John',  target: 'ex:Jane',           label: 'foaf:knows' } },
-        { data: { source: 'ex:John',  target: 'ex:ACME',           label: 'foaf:member' } },
-        { data: { source: 'ex:John',  target: '"John Doe"',        label: 'foaf:name'  } },
-        { data: { source: 'ex:John',  target: '"30"',              label: 'foaf:age'   } },
-        { data: { source: 'ex:Jane',  target: 'ex:ACME',           label: 'foaf:member' } },
-    ]
-})
-const error = ref(null)
-const running = ref(false)
-const history = ref([])
+function exportResults(format) {
+    exportResultsFormat(format);
+}
 
 import cytoscape from 'cytoscape'
 
@@ -141,18 +121,25 @@ watch(
             </div>
 
             <!-- SELECT → Table -->
-            <div v-if="results?.type === 'SELECT' && !running">
+            <div v-if="results?.type === 'SELECT' && !running" class="overflow-x-auto w-full">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="text-left text-xs text-gray-400 uppercase tracking-wide border-b ">
-                            <th v-for="v in results.vars" :key="v" class="pb-2 pr-4 font-medium">?{{ v }}</th>
+                        <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-200 dark:border-gray-800">
+                            <th v-for="v in results.vars" :key="v" class="pb-2 pr-4 font-medium whitespace-nowrap">?{{ v }}</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-50">
-                        <tr v-for="(row, i) in results.rows" :key="i" class="hover:bg-gray-50">
-                            <td v-for="v in results.vars" :key="v" class="py-2 pr-4 text-xs">
-                                <span class="font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                                    {{ row[v] ?? '—' }}
+                    <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+                        <tr v-for="(row, i) in results.rows" :key="i" class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <td v-for="v in results.vars" :key="v" class="py-2 pr-4 text-xs font-mono whitespace-nowrap">
+                                <span v-if="row[v] === undefined || row[v] === null" class="text-gray-400 dark:text-gray-600">—</span>
+                                <span v-else-if="String(row[v]).startsWith('http') || String(row[v]).startsWith('urn:')" class="text-blue-600 dark:text-blue-400">
+                                    &lt;{{ row[v] }}&gt;
+                                </span>
+                                <span v-else-if="!isNaN(Number(row[v])) && String(row[v]).trim() !== ''" class="text-emerald-600 dark:text-emerald-400">
+                                    {{ row[v] }}
+                                </span>
+                                <span v-else class="text-amber-600 dark:text-amber-400">
+                                    "{{ row[v] }}"
                                 </span>
                             </td>
                         </tr>

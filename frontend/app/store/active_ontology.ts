@@ -13,6 +13,7 @@ export const useActiveOntologiesStore = defineStore("active_ontologies", {
 
   getters: {
     getOntologies: (state) => state.ontologies,
+    getOntologiesIds: (state) => state.ontologies.map((o) => o.id),
   },
 
   actions: {
