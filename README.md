@@ -1,108 +1,68 @@
-# Sematica
-## Desktop application for managing semantic web knowledge bases
+# Semantica
 
+> Desktop application for managing semantic web knowledge bases.
 
-# I -  Pre-requisites
-## 1- System dependencies
-### Linux :
+Semantica is a cross-platform desktop application that lets you upload, explore, query, and reason over RDF graphs and OWL/RDFS ontologies — all from a local GUI, with no external triplestore required.
+
+> **Status:** Beta — core features are working but the API and data models may still change.
+
+---
+
+## Features
+
+- **RDF Graph management** — upload Turtle, N-Triples, RDF/XML, and JSON-LD files; browse subjects, predicates, and objects; visualize graphs interactively
+- **Ontology exploration** — parse OWL and RDFS ontologies; inspect class hierarchies, properties, restrictions, and individuals
+- **SPARQL editor** — run SELECT, ASK, DESCRIBE, CONSTRUCT, and UPDATE queries with autocompletion; export results as JSON, CSV, or XML
+- **Deductive reasoning** — apply RDFS, OWL-RL, or combined RDFS+OWL-RL closure and inspect inferred triples
+- **Local-first** — everything runs on your machine; data is stored in a local SQLite database
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Desktop shell | [Tauri](https://tauri.app/) (Rust) |
+| Frontend | [Vue.js](https://vuejs.org/) / [Nuxt](https://nuxt.com/) |
+| Backend | [FastAPI](https://fastapi.tiangolo.com/) (Python) |
+| Database | [SQLite](https://www.sqlite.org/) via [SQLModel](https://sqlmodel.tiangolo.com/) |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+See [docs/PRE-REQUISITES.md](docs/PRE-REQUISITES.md) for the full list of required runtimes and tools.
+
+### Setup
+
 ```bash
-sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential \
-  curl \
-  wget \
-  file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
-```
-### Windows :
-Tauri uses the Microsoft C++ Build Tools for development as well as Microsoft Edge WebView2. These are both required for development on Windows.
-#### Microsoft C++ Build Tools
-- Download the [Microsoft C++ Build Tools installer](https://visualstudio.microsoft.com/fr/visual-cpp-build-tools/) and open it to begin installation.
-- During installation check the “Desktop development with C++” option
-
-#### WebView2
-- Install WebView2 by visiting the [Microsoft Edge WebView2 installer](https://developer.microsoft.com/en-us/microsoft-edge/webview2/?form=MA13LH#download-section). Download the “Evergreen Bootstrapper” and install it.
-
-
-## 2- Rust and cargo 
-### Linux 
-```bash
-curl --proto '=https' --tlsv1.2 https://sh.rustup.rs -sSf | sh
-```
-in a new terminal window install the cargo tauri cli :
-```bash
-cargo install tauri-cli --version "^2.0.0" --locked
-```
-### Windows
-in Powershell (run as administrator)
-```Powershell
-winget install --id Rustlang.Rustup
-```
-## 3- Node.js
-
-## 4- Python 
-
-## 5- UV - Python package manager
-### Linux 
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-### Windows
-```Powershell
-powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-
-# II - Project Setup
-1. Clone the repository
-```bash
-git clone https://github.com/afadel151/semantica.git
+git clone https://github.com/your-username/semantica.git
 cd semantica
 ```
-2. Install dependencies
-```bash
-cd frontend
-npm install
-cd ../backend
-uv sync 
-```
-3. compile fastAPI to binary
-```bash
-cd backend
-pyinstaller backend-server.spec
-```
-4. Register the sidecar in Tauri
-```bash
-# Get your target triple:
-rustc -vV | grep host
-# e.g: host: x86_64-unknown-linux-gnu
 
-cp backend/dist/backend-server src-tauri/binaries/backend-server-x86_64-unknown-linux-gnu
-```
+Then follow [docs/SETUP.md](docs/SETUP.md) to configure the backend and frontend.
 
-## III - Development workflow
+### Development
 
-1. Start the backend server
-```bash
-cd backend
-uvicorn main:app --reload --port 8000
-```
-2. Start the Tauri application
-```bash
-cargo tauri dev
-```
+See [docs/DEV.md](docs/DEV.md) to run the app in development mode.
 
+### Build
 
-## IV - build for production 
-```bash
-# 1. Compile FastAPI to binary
-cd backend && pyinstaller --onefile --name backend-server main.py
-cp dist/backend-server ../src-tauri/binaries/backend-server-<target-triple>
+See [docs/BUILD.md](docs/BUILD.md) to produce a distributable desktop binary.
 
-# 2. Build the full app
-cargo tauri build
-# Output: src-tauri/target/release/bundle/
-```
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/PRE-REQUISITES.md](docs/PRE-REQUISITES.md) | Required runtimes, tools, and system dependencies |
+| [docs/SETUP.md](docs/SETUP.md) | Installation and configuration instructions |
+| [docs/DEV.md](docs/DEV.md) | Running the app locally in development mode |
+| [docs/BUILD.md](docs/BUILD.md) | Building a production desktop binary with Tauri |
+| [docs/API.md](docs/API.md) | REST API reference (endpoints, request/response schemas) |
+| [docs/MODELS.md](docs/MODELS.md) | Database model reference (tables, columns, relationships) |
+
+---

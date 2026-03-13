@@ -7,15 +7,21 @@ from pathlib import Path
 from datetime import datetime
 import uuid
 import rdflib
-
+from pydantic import BaseModel
 router = APIRouter(prefix="/rdf", tags=["rdf"])
 
 GRAPHS_STORAGE = Path(__file__).resolve().parent.parent.parent.parent / "storage" / "files" / "graphs"
 
+class StatsResponse(BaseModel):
+    total_graphs:     int
+    total_triples:    int
+    total_subjects:   int
+    total_predicates: int
+    total_objects:    int
 
 
 @router.get("/stats")
-def get_stats(session: Session = Depends(get_session)):
+def get_stats(session: Session = Depends(get_session)) -> StatsResponse:
     total_graphs    = session.exec(select(func.count()).select_from(Graph)).one()
     total_triples   = session.exec(select(func.sum(Graph.triples_count))).one() or 0
     total_subjects  = session.exec(select(func.count()).select_from(Subject)).one()
