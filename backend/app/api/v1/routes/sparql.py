@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from rdflib import Graph as RDFGraph
 
 from app.core.db import get_session
-from app.models.sparql import SparqlHistory, SparqlQueryRequest,ConstructExportRequest
+from app.models.sparql import SparqlHistory, SparqlQueryRequest, ConstructExportRequest, SparqlUpdateRequest, GenerateUpdateRequest
 from app.models.rdf import Graph
 
 router = APIRouter(prefix="/sparql", tags=["sparql"])
@@ -336,3 +336,227 @@ def delete_query(
     session.commit()
 
     return {"message": "Query deleted"}
+
+
+# ----------------------------
+# UPDATE (INSERT / DELETE)
+# ----------------------------
+@router.post("/update")
+def run_update(
+    data: SparqlUpdateRequest,
+    session: Session = Depends(get_session)
+):
+    """Exécute une requête SPARQL UPDATE (INSERT DATA / DELETE DATA / DELETE WHERE)."""
+    import time
+
+    graph = session.get(Graph, data.graph_id)
+    if not graph:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    g = RDFGraph()
+    try:
+        g.parse(graph.file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible de charger le graphe : {e}")
+
+    triples_before = len(g)
+    start = time.time()
+
+    try:
+        g.update(data.query)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erreur SPARQL UPDATE : {e}")
+
+    execution_time = round((time.time() - start) * 1000)
+    triples_after = len(g)
+    triples_added = max(0, triples_after - triples_before)
+    triples_removed = max(0, triples_before - triples_after)
+
+    # Sauvegarder le graphe modifié sur le disque
+    try:
+        g.serialize(destination=graph.file_path, format=graph.format)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible de sauvegarder le graphe : {e}")
+
+    # Mettre à jour le compteur de triplets en base
+    graph.triples_count = triples_after
+    session.add(graph)
+
+    # Historique
+    query_text = data.query.strip()
+    if "INSERT" in query_text.upper():
+        q_type = "INSERT"
+    elif "DELETE" in query_text.upper():
+        q_type = "DELETE"
+    else:
+        q_type = "UPDATE"
+
+    history = SparqlHistory(
+        query=data.query,
+        query_type=q_type,
+        graph_id=data.graph_id
+    )
+    session.add(history)
+    session.commit()
+
+    return {
+        "success": True,
+        "execution_time": execution_time,
+        "triples_before": triples_before,
+        "triples_after": triples_after,
+        "triples_added": triples_added,
+        "triples_removed": triples_removed,
+        "graph_size": triples_after,
+    }
+
+
+# ----------------------------
+# SCHEMA — pour l'autocomplétion
+# ----------------------------
+@router.get("/schema")
+def get_schema(
+    graph_id: uuid.UUID,
+    session: Session = Depends(get_session)
+):
+    """Retourne les préfixes, classes et propriétés du graphe RDF actif."""
+    from rdflib.namespace import RDF, RDFS, OWL
+
+    graph = session.get(Graph, graph_id)
+    if not graph:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    g = RDFGraph()
+    try:
+        g.parse(graph.file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible de charger le graphe : {e}")
+
+    # Préfixes déclarés
+    prefixes = {}
+    for prefix, namespace in g.namespaces():
+        prefixes[str(prefix)] = str(namespace)
+
+    # Classes (objets de rdf:type)
+    classes = set()
+    for _, _, o in g.triples((None, RDF.type, None)):
+        classes.add(str(o))
+
+    # Propriétés (prédicats utilisés)
+    properties = set()
+    for _, p, _ in g.triples((None, None, None)):
+        properties.add(str(p))
+
+    # Sujets (pour les suggestions d'entités)
+    subjects = set()
+    for s, _, _ in g.triples((None, None, None)):
+        subjects.add(str(s))
+
+    return {
+        "prefixes": prefixes,
+        "classes": sorted(list(classes))[:200],
+        "properties": sorted(list(properties))[:200],
+        "subjects": sorted(list(subjects))[:100],
+        "graph_size": len(g),
+    }
+
+
+# ----------------------------
+# GENERATE UPDATE — génération automatique de requêtes
+# ----------------------------
+@router.post("/generate-update")
+def generate_update_query(
+    data: GenerateUpdateRequest,
+    session: Session = Depends(get_session)
+):
+    """Génère automatiquement une requête SPARQL UPDATE à partir de la structure du graphe."""
+    from rdflib.namespace import RDF
+
+    graph = session.get(Graph, data.graph_id)
+    if not graph:
+        raise HTTPException(status_code=404, detail="Graph not found")
+
+    g = RDFGraph()
+    try:
+        g.parse(graph.file_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible de charger le graphe : {e}")
+
+    # Récupérer les préfixes du graphe
+    prefix_lines = []
+    prefix_map = {}
+    for prefix, namespace in g.namespaces():
+        if str(prefix):  # ignorer le préfixe vide
+            prefix_lines.append(f"PREFIX {prefix}: <{namespace}>")
+            prefix_map[str(namespace)] = str(prefix)
+
+    def uri_to_prefixed(uri):
+        for ns, pref in prefix_map.items():
+            if uri.startswith(ns):
+                return f"{pref}:{uri[len(ns):]}"
+        return f"<{uri}>"
+
+    prefixes_str = "\n".join(prefix_lines[:10])  # Limiter à 10 préfixes
+
+    if data.mode == "insert":
+        # Prendre le premier triplet comme exemple
+        example_triple = next(iter(g), None)
+        if example_triple:
+            s, p, o = example_triple
+            s_str = uri_to_prefixed(str(s))
+            p_str = uri_to_prefixed(str(p))
+            # Objet : literal ou URI
+            if hasattr(o, 'toPython'):
+                o_str = f'"{str(o)}"'
+            elif str(o).startswith("http") or str(o).startswith("urn:"):
+                o_str = uri_to_prefixed(str(o))
+            else:
+                o_str = f'"{str(o)}"'
+        else:
+            s_str = "<http://example.org/subject>"
+            p_str = "<http://example.org/predicate>"
+            o_str = '"valeur"'
+
+        query = f"""{prefixes_str}
+
+INSERT DATA {{
+  {s_str} {p_str} {o_str} .
+}}"""
+
+    elif data.mode == "delete":
+        # Prendre le premier triplet comme exemple
+        example_triple = next(iter(g), None)
+        if example_triple:
+            s, p, o = example_triple
+            s_str = uri_to_prefixed(str(s))
+            p_str = uri_to_prefixed(str(p))
+            if hasattr(o, 'toPython'):
+                o_str = f'"{str(o)}"'
+            elif str(o).startswith("http") or str(o).startswith("urn:"):
+                o_str = uri_to_prefixed(str(o))
+            else:
+                o_str = f'"{str(o)}"'
+        else:
+            s_str = "<http://example.org/subject>"
+            p_str = "<http://example.org/predicate>"
+            o_str = '"valeur"'
+
+        query = f"""{prefixes_str}
+
+DELETE DATA {{
+  {s_str} {p_str} {o_str} .
+}}"""
+
+    else:
+        # Mode générique DELETE WHERE
+        query = f"""{prefixes_str}
+
+DELETE WHERE {{
+  ?subject ?predicate ?object .
+}}"""
+
+    return {
+        "query": query,
+        "mode": data.mode,
+        "graph_size": len(g),
+    }
+

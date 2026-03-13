@@ -1,4 +1,4 @@
-type QueryType = "SELECT" | "CONSTRUCT" | "DESCRIBE" | "ASK";
+type QueryType = "SELECT" | "CONSTRUCT" | "DESCRIBE" | "ASK" | "INSERT" | "DELETE" | "UPDATE";
 
 type BadgeVariant =
   | "default"
@@ -21,7 +21,13 @@ export function mapQueryToVariant(type: QueryType): BadgeVariant {
     case "CONSTRUCT":
       return "construct";
     case "DESCRIBE":
-      return "describe"; // or whatever style you want
+      return "describe";
+    case "INSERT":
+      return "default";
+    case "DELETE":
+      return "destructive";
+    case "UPDATE":
+      return "secondary";
     default:
       return "default";
   }

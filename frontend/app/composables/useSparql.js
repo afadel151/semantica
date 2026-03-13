@@ -1,8 +1,6 @@
 import { useActiveGraphStore } from "~/store/active_graph";
 
 export const useSparqlState = () => {
-  // ── Graphe actif : on lit directement le store Pinia (source de vérité) ──
-  // Le store est alimenté par la page /rdf/[id].vue via le bouton "Set as Active"
   const activeGraphStore = useActiveGraphStore();
   const activeGraphId = computed(() => activeGraphStore.getId || null);
   const activeGraphName = computed(() => activeGraphStore.getName || null);
@@ -18,9 +16,20 @@ LIMIT 25`,
 
   const results = useState("sparql_results", () => null);
   const history = useState("sparql_history", () => []);
-
   const isRunning = useState("sparql_is_running", () => false);
   const error = useState("sparql_error", () => null);
+
+  // Nouvel état : résultat d'une requête UPDATE
+  const updateResult = useState("sparql_update_result", () => null);
+
+  // Nouvel état : schéma RDF pour l'autocomplétion
+  const schema = useState("sparql_schema", () => ({
+    prefixes: {},
+    classes: [],
+    properties: [],
+    subjects: [],
+    graph_size: 0,
+  }));
 
   return {
     activeGraphId,
@@ -30,16 +39,18 @@ LIMIT 25`,
     history,
     isRunning,
     error,
+    updateResult,
+    schema,
   };
 };
 
 export const useSparqlActions = () => {
-  const { activeGraphId, query, results, history, isRunning, error } =
+  const { activeGraphId, query, results, history, isRunning, error, updateResult, schema } =
     useSparqlState();
   const config = useRuntimeConfig();
   const apiUrl = config.public.apiBase || "http://localhost:8000/api/v1";
 
-  // Charger l'historique récent
+  // ─── Historique ───────────────────────────────────────────────────────────
   const fetchHistory = async () => {
     try {
       const res = await $fetch(`${apiUrl}/sparql/recent`);
@@ -49,30 +60,48 @@ export const useSparqlActions = () => {
     }
   };
 
-  // Détecter le type de la requête (SELECT, ASK, CONSTRUCT, DESCRIBE)
+  // ─── Détecter le type de requête ──────────────────────────────────────────
   const detectQueryType = (q) => {
     if (!q) return null;
     const cleaned = q.replace(/#.*$/gm, "").trim();
-    const match = cleaned.match(/\b(SELECT|ASK|CONSTRUCT|DESCRIBE)\b/i);
+    const match = cleaned.match(/\b(SELECT|ASK|CONSTRUCT|DESCRIBE|INSERT|DELETE)\b/i);
     return match ? match[1].toUpperCase() : null;
   };
 
-  // Exécuter la requête UNIQUEMENT sur le graphe actif
+  // ─── Charger le schéma RDF pour l'autocomplétion ─────────────────────────
+  const fetchSchema = async (graphId) => {
+    if (!graphId) return;
+    try {
+      const res = await $fetch(`${apiUrl}/sparql/schema?graph_id=${graphId}`);
+      schema.value = res;
+    } catch (err) {
+      console.error("Failed to fetch schema", err);
+    }
+  };
+
+  // ─── Exécuter requête SELECT / ASK / CONSTRUCT / DESCRIBE ────────────────
   const runQuery = async () => {
     if (!query.value.trim() || isRunning.value) return;
 
-    // ── Vérification : graphe actif obligatoire ──────────────────────────────
     if (!activeGraphId.value) {
       error.value =
         "⚠️ Aucun graphe actif. Rendez-vous dans Graphs → ouvrez un graphe → cliquez « Set as Active » avant d'exécuter une requête.";
       return;
     }
 
+    const type = detectQueryType(query.value) || "SELECT";
+
+    // Si c'est une requête UPDATE, déléguer à runUpdateQuery
+    if (type === "INSERT" || type === "DELETE") {
+      await runUpdateQuery(query.value);
+      return;
+    }
+
     isRunning.value = true;
     error.value = null;
     results.value = null;
+    updateResult.value = null;
 
-    const type = detectQueryType(query.value) || "SELECT";
     const endpointMap = {
       SELECT: "select",
       ASK: "ask",
@@ -88,7 +117,7 @@ export const useSparqlActions = () => {
         method: "POST",
         body: {
           query: query.value,
-          graph_id: activeGraphId.value, // ← toujours le graphe actif du store
+          graph_id: activeGraphId.value,
         },
       });
 
@@ -113,13 +142,20 @@ export const useSparqlActions = () => {
           vars.forEach((v, i) => (obj[v] = r[i]));
           return obj;
         });
-        results.value = { type: "SELECT", vars, rows, execution_time };
+        results.value = {
+          type: "SELECT",
+          vars,
+          rows,
+          execution_time,
+          graph_size: schema.value?.graph_size || 0,
+        };
 
       } else if (type === "ASK") {
         results.value = {
           type: "ASK",
           result: res.result ? "TRUE" : "FALSE",
           execution_time,
+          graph_size: schema.value?.graph_size || 0,
         };
 
       } else if (type === "CONSTRUCT") {
@@ -146,6 +182,7 @@ export const useSparqlActions = () => {
           elements,
           rawTriples: rawData,
           execution_time,
+          graph_size: schema.value?.graph_size || 0,
         };
       }
 
@@ -161,10 +198,64 @@ export const useSparqlActions = () => {
     }
   };
 
+  // ─── Exécuter requête UPDATE (INSERT/DELETE) ──────────────────────────────
+  const runUpdateQuery = async (queryText) => {
+    if (!activeGraphId.value) {
+      error.value = "⚠️ Aucun graphe actif.";
+      return;
+    }
+
+    isRunning.value = true;
+    error.value = null;
+    results.value = null;
+    updateResult.value = null;
+
+    try {
+      const res = await $fetch(`${apiUrl}/sparql/update`, {
+        method: "POST",
+        body: {
+          query: queryText || query.value,
+          graph_id: activeGraphId.value,
+        },
+      });
+      updateResult.value = res;
+      // Rafraîchir le schéma après modification du graphe
+      await fetchSchema(activeGraphId.value);
+      await fetchHistory();
+    } catch (err) {
+      console.error("UPDATE Error:", err);
+      error.value = err.data?.detail || err.message || "Erreur UPDATE.";
+    } finally {
+      isRunning.value = false;
+    }
+  };
+
+  // ─── Générer automatiquement une requête UPDATE ───────────────────────────
+  const generateUpdate = async (mode) => {
+    if (!activeGraphId.value) {
+      error.value = "⚠️ Aucun graphe actif.";
+      return;
+    }
+    try {
+      const res = await $fetch(`${apiUrl}/sparql/generate-update`, {
+        method: "POST",
+        body: {
+          graph_id: activeGraphId.value,
+          mode,
+        },
+      });
+      query.value = res.query;
+    } catch (err) {
+      console.error("Generate error:", err);
+      error.value = err.data?.detail || "Erreur lors de la génération.";
+    }
+  };
+
   const clearState = () => {
     query.value = "";
     results.value = null;
     error.value = null;
+    updateResult.value = null;
   };
 
   const loadFromHistory = (h) => {
@@ -197,7 +288,10 @@ export const useSparqlActions = () => {
 
   return {
     fetchHistory,
+    fetchSchema,
     runQuery,
+    runUpdateQuery,
+    generateUpdate,
     detectQueryType,
     clearState,
     loadFromHistory,

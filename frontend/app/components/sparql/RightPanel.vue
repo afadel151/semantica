@@ -1,8 +1,9 @@
 <script setup>
-import { Download, Settings, Table2, Share2, ZoomIn, ZoomOut, Maximize2, RefreshCw } from 'lucide-vue-next';
+import { Download, Settings, Table2, Share2, ZoomIn, ZoomOut, Maximize2, RefreshCw, CheckCircle2, XCircle, Star } from 'lucide-vue-next';
 import { useSparqlState, useSparqlActions } from '~/composables/useSparql';
+import PerformanceMetrics from '~/components/sparql/PerformanceMetrics.vue';
 
-const { results, error, isRunning: running } = useSparqlState();
+const { results, error, isRunning: running, updateResult } = useSparqlState();
 const { exportResultsFormat } = useSparqlActions();
 
 function exportResults(format) {
@@ -23,13 +24,26 @@ const showToggle = computed(() =>
     results.value?.type === 'SELECT' || results.value?.type === 'CONSTRUCT'
 );
 
+// ─── RDF-star indicator ──────────────────────────────────────────────────────
+const hasRdfStar = computed(() => {
+    const r = results.value;
+    if (!r) return false;
+    // On détecte si un triplet ressemble à un RDF-star (contient "<<" dans les données)
+    if (r.type === 'SELECT') {
+        return r.rows?.some(row => Object.values(row).some(v => String(v || '').includes('<<')));
+    }
+    if (r.type === 'CONSTRUCT') {
+        return r.rawTriples?.some(t => t.some(v => String(v || '').includes('<<')));
+    }
+    return false;
+});
+
 // ─── Cytoscape ───────────────────────────────────────────────────────────────
 const graphContainer = ref(null);
 let cyInstance = null;
 const graphStats = ref({ nodes: 0, edges: 0 });
 const hasCyInstance = ref(false);
 
-// ─── Node type helpers (mirrors backend graph_to_cytoscape) ──────────────────
 function getNodeType(val) {
     const s = String(val);
     if (s.startsWith('_:'))                            return 'blank';
@@ -43,7 +57,6 @@ function getNodeLabel(val) {
     return s.split(/[/#]/).pop() || s;
 }
 
-// ─── Build Cytoscape elements from SELECT rows ────────────────────────────────
 function buildSelectElements(rows, vars) {
     const elements = [];
     const nodesSet = new Set();
@@ -102,7 +115,6 @@ function zoomOut()      { cyInstance?.zoom(cyInstance.zoom() * 0.8); }
 function fit()          { cyInstance?.fit(); }
 function refreshGraph() { applyLayout(); }
 
-// ─── initCytoscape — copie exacte de [id].vue ────────────────────────────────
 function initCytoscape(elements) {
     if (!graphContainer.value) return;
     if (cyInstance) { cyInstance.destroy(); cyInstance = null; hasCyInstance.value = false; }
@@ -181,13 +193,11 @@ function initCytoscape(elements) {
             nodes: cyInstance.nodes().length,
             edges: cyInstance.edges().length,
         };
-        // CRUCIAL : forcer Cytoscape à recalculer les dimensions après rendu
         cyInstance.resize();
         cyInstance.fit();
     });
 }
 
-// ─── Watcher principal ───────────────────────────────────────────────────────
 watch(
     [() => results.value, () => viewMode.value, graphContainer],
     async ([val, mode, container]) => {
@@ -217,7 +227,6 @@ onBeforeUnmount(() => {
     if (cyInstance) { cyInstance.destroy(); cyInstance = null; }
 });
 
-// ─── Helper URI court ─────────────────────────────────────────────────────────
 function shortUri(val) {
     if (!val) return '—';
     return String(val).split(/[/#]/).pop() || String(val);
@@ -227,9 +236,15 @@ function shortUri(val) {
 <template>
     <Card class="w-full h-fit rounded-xl justify-between flex flex-col overflow-hidden">
 
-        <!-- Results Header -->
+        <!-- En-tête résultats -->
         <CardHeader class="flex flex-row items-center justify-between gap-2 flex-wrap">
-            <CardTitle>Results</CardTitle>
+            <div class="flex items-center gap-2">
+                <CardTitle>Résultats</CardTitle>
+                <!-- Badge RDF-star -->
+                <Badge v-if="hasRdfStar" variant="secondary" class="flex items-center gap-1 text-yellow-600 dark:text-yellow-400">
+                    <Star class="w-3 h-3" /> RDF-star
+                </Badge>
+            </div>
 
             <div class="flex items-center gap-2 flex-wrap">
                 <!-- Toggle Table / Graph -->
@@ -255,47 +270,76 @@ function shortUri(val) {
                                 : 'text-muted-foreground hover:bg-muted'
                         ]"
                     >
-                        <Share2 class="w-3.5 h-3.5" /> Graph
+                        <Share2 class="w-3.5 h-3.5" /> Graphe
                     </button>
                 </div>
 
-                <!-- Export buttons -->
-                <Button @click="exportResults('json')" size="sm">
-                    <Download /> JSON
-                </Button>
-                <Button @click="exportResults('csv')" variant="outline" size="sm">
-                    <Download /> CSV
-                </Button>
-                <Button @click="exportResults('xml')" variant="outline" size="sm">
-                    <Download /> XML
-                </Button>
+                <!-- Boutons export (seulement pour SELECT/CONSTRUCT) -->
+                <template v-if="results && (results.type === 'SELECT' || results.type === 'CONSTRUCT')">
+                    <Button @click="exportResults('json')" size="sm">
+                        <Download /> JSON
+                    </Button>
+                    <Button @click="exportResults('csv')" variant="outline" size="sm">
+                        <Download /> CSV
+                    </Button>
+                    <Button @click="exportResults('xml')" variant="outline" size="sm">
+                        <Download /> XML
+                    </Button>
+                </template>
             </div>
         </CardHeader>
 
-        <!-- Results Body -->
-        <CardContent class="overflow-auto w-full h-full p-2">
+        <!-- Corps des résultats -->
+        <CardContent class="overflow-auto w-full h-full p-2 flex flex-col gap-3">
 
-            <!-- Empty state -->
-            <div v-if="!results && !running && !error"
+            <!-- État vide -->
+            <div v-if="!results && !updateResult && !running && !error"
                 class="h-full flex flex-col items-center justify-center text-gray-300">
                 <p class="text-4xl mb-3">🔍</p>
-                <p class="text-sm font-medium">Run a query to see results</p>
-                <p class="text-xs mt-1">Ctrl+Enter to run</p>
+                <p class="text-sm font-medium">Exécutez une requête pour voir les résultats</p>
+                <p class="text-xs mt-1">Ctrl+Enter pour lancer</p>
             </div>
 
-            <!-- Loading -->
+            <!-- Chargement -->
             <div v-if="running" class="h-full flex-col flex items-center justify-center">
                 <Settings class="animate-spin" />
-                <p class="text-sm">Executing query...</p>
+                <p class="text-sm">Exécution en cours…</p>
             </div>
 
-            <!-- Error -->
+            <!-- Erreur -->
             <div v-if="error" class="h-full flex-col flex items-center justify-center">
-                <p class="text-sm font-semibold text-red-600 mb-1">Query Error</p>
+                <p class="text-sm font-semibold text-red-600 mb-1">Erreur de requête</p>
                 <p class="text-xs text-red-500 font-mono whitespace-pre-wrap">{{ error }}</p>
             </div>
 
-            <!-- ── SELECT → Table mode ── -->
+            <!-- ── Résultat UPDATE ── -->
+            <div v-if="updateResult && !running"
+                class="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950 p-4 flex flex-col gap-3">
+                <div class="flex items-center gap-2">
+                    <CheckCircle2 class="w-5 h-5 text-emerald-500" />
+                    <p class="font-semibold text-emerald-700 dark:text-emerald-300">Requête UPDATE exécutée avec succès</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="rounded-lg bg-white dark:bg-gray-900 border border-emerald-200 dark:border-emerald-800 p-3 text-center">
+                        <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{{ updateResult.triples_added }}</p>
+                        <p class="text-xs text-muted-foreground mt-1">Triplets ajoutés</p>
+                    </div>
+                    <div class="rounded-lg bg-white dark:bg-gray-900 border border-red-200 dark:border-red-800 p-3 text-center">
+                        <p class="text-2xl font-bold text-red-500 dark:text-red-400">{{ updateResult.triples_removed }}</p>
+                        <p class="text-xs text-muted-foreground mt-1">Triplets supprimés</p>
+                    </div>
+                    <div class="rounded-lg bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-800 p-3 text-center">
+                        <p class="text-2xl font-bold text-blue-600 dark:text-blue-400">{{ updateResult.graph_size }}</p>
+                        <p class="text-xs text-muted-foreground mt-1">Total triplets</p>
+                    </div>
+                    <div class="rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-3 text-center">
+                        <p class="text-2xl font-bold text-foreground">{{ updateResult.execution_time }} ms</p>
+                        <p class="text-xs text-muted-foreground mt-1">Temps d'exécution</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── SELECT → Table ── -->
             <div v-if="results?.type === 'SELECT' && !running && viewMode === 'table'" class="overflow-x-auto w-full">
                 <table class="w-full text-sm">
                     <thead>
@@ -320,20 +364,17 @@ function shortUri(val) {
                         </tr>
                     </tbody>
                 </table>
-                <p class="text-xs text-muted-foreground mt-2">{{ results.rows.length }} résultat(s) — {{ results.execution_time }}ms</p>
             </div>
 
-            <!-- ── ASK → Boolean ── -->
+            <!-- ── ASK → Booléen ── -->
             <div v-if="results?.type === 'ASK' && !running" class="h-full">
                 <p class="text-2xl font-bold" :class="results.result === 'TRUE' ? 'text-green-600' : 'text-red-500'">
                     {{ results.result }}
                 </p>
-                <p class="text-primary">execution time: {{ results.execution_time }}ms</p>
             </div>
 
-            <!-- ── CONSTRUCT → Table mode (S / P / O) ── -->
+            <!-- ── CONSTRUCT → Table ── -->
             <div v-if="results?.type === 'CONSTRUCT' && !running && viewMode === 'table'" class="overflow-x-auto w-full">
-                <p class="text-xs text-muted-foreground mb-2">{{ results.triple_count }} triplet(s) — {{ results.execution_time }}ms</p>
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide border-b border-gray-200 dark:border-gray-800">
@@ -360,13 +401,14 @@ function shortUri(val) {
                 </table>
             </div>
 
-            <!-- ── SELECT / CONSTRUCT → Graph mode (Cytoscape) ── -->
+            <!-- ── SELECT / CONSTRUCT → Graphe (Cytoscape) ── -->
             <div
                 v-if="!running && results && viewMode === 'graph' && (results.type === 'SELECT' || results.type === 'CONSTRUCT')"
-                class="flex flex-col gap-2"
+                
                 style="min-height: 520px;"
+                class="overflow-x-auto w-full"
             >
-                <!-- Legend -->
+                <!-- Légende -->
                 <div class="flex items-center gap-4 px-1 shrink-0">
                     <div class="flex items-center gap-1.5">
                         <span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span>
@@ -382,14 +424,14 @@ function shortUri(val) {
                     </div>
                 </div>
 
-                <!-- Graph canvas wrapper -->
+                <!-- Canvas graphe -->
                 <div class="rounded-xl border overflow-hidden relative" style="height: 480px; width: 100%;">
 
-                    <!-- Controls overlay -->
+                    <!-- Contrôles en overlay -->
                     <div class="absolute top-2 right-2 z-10 flex items-center gap-2 bg-background/90 backdrop-blur-sm rounded-xl border px-3 py-2 shadow-sm">
                         <template v-if="hasCyInstance">
-                            <Badge variant="secondary">{{ graphStats.nodes }} nodes</Badge>
-                            <Badge variant="secondary">{{ graphStats.edges }} edges</Badge>
+                            <Badge variant="secondary">{{ graphStats.nodes }} nœuds</Badge>
+                            <Badge variant="secondary">{{ graphStats.edges }} arêtes</Badge>
                         </template>
                         <Select v-model="selectedLayout" @update:model-value="applyLayout">
                             <SelectTrigger class="w-[140px] h-7 text-xs">
@@ -417,11 +459,12 @@ function shortUri(val) {
                         </div>
                     </div>
 
-                    <!-- Cytoscape canvas — hauteur explicite obligatoire -->
                     <div ref="graphContainer" style="width: 100%; height: 480px;"></div>
-
                 </div>
             </div>
+
+            <!-- ── Métriques de performance ── -->
+            <PerformanceMetrics />
 
         </CardContent>
     </Card>
