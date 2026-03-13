@@ -10,13 +10,10 @@ definePageMeta({
 
 <template>
   <div class="flex flex-col gap-5 p-2 flex-1 w-full h-full min-h-0">
-    <!-- 1. Éditeur de requête -->
     <LeftPanel />
 
-    <!-- 2. Résultats de la requête -->
     <RightPanel />
 
-    <!-- 3. Requêtes récentes -->
     <RecentQueries />
   </div>
 </template>

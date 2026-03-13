@@ -12,6 +12,8 @@ onMounted(async () => {
   const colorMode = useColorMode()
   colorMode.preference = 'system'
 })
+
+
 </script>
 <template>
   <NuxtLoadingIndicator />
