@@ -30,3 +30,13 @@ class SparqlQueryRequest(SQLModel):
 
 class ConstructExportRequest(BaseModel):
     triples: list[list[str]]
+
+
+class SparqlUpdateRequest(BaseModel):
+    query: str
+    graph_id: uuid.UUID
+
+
+class GenerateUpdateRequest(BaseModel):
+    graph_id: uuid.UUID
+    mode: str  # "insert" ou "delete"
