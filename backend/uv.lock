@@ -101,7 +101,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.18.4" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.129.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.0" },
-    { name = "owlrl", specifier = ">=7.1.4" },
+    { name = "owlrl", specifier = "==6.0.2" },
     { name = "pydantic-settings", specifier = ">=2.13.1" },
     { name = "pyinstaller", specifier = ">=6.19.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
@@ -546,14 +546,14 @@ wheels = [
 
 [[package]]
 name = "owlrl"
-version = "7.1.4"
+version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "rdflib" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d1/fc/ce12482d096d65fff01af58f555a6f25e9dbf416fad5d99f91eaab0e11ca/owlrl-7.1.4.tar.gz", hash = "sha256:60bd4067e346b9111f0a2924565afe97ac6595b98b2bbe953928b5113971daf7", size = 44420, upload-time = "2025-07-29T00:17:27.608Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/c7/208aece36279e4f1236e437119358786e39530ecc1719d4e1afeddba5288/owlrl-6.0.2.tar.gz", hash = "sha256:904e3310ff4df15101475776693d2427d1f8244ee9a6a9f9e13c3c57fae90b74", size = 57179, upload-time = "2021-10-10T12:52:04.161Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/78/f857ff1a7207e967dc5e8414bbcc15e0aa5cf45f693b1d2ebe2afb3eb1ce/owlrl-7.1.4-py3-none-any.whl", hash = "sha256:e78b46020169783345636da93a467d318f18700c483184dd15e885850cf64775", size = 51981, upload-time = "2025-07-29T00:17:26.229Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/56/11fe63c2c317347f69be17e9ece1991e0ec6c2cdb8225c0baa5b96e283ed/owlrl-6.0.2-py3-none-any.whl", hash = "sha256:57eca06b221edbbc682376c8d42e2ddffc99f61e82c0da02e26735592f08bacc", size = 54516, upload-time = "2021-10-10T12:52:01.711Z" },
 ]
 
 [[package]]

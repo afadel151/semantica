@@ -83,12 +83,10 @@ def delete_file(file_id: uuid.UUID, session: Session = Depends(get_session)):
     if not graph:
         raise HTTPException(status_code=404, detail="Graph not found.")
 
-    # Remove file from disk
     file_path = Path(graph.file_path)
     if file_path.exists():
         file_path.unlink()
 
-    # Cascade deletes 
     session.delete(graph)
     session.commit()
     return {"detail": f"Graph '{graph.name}' deleted successfully."}
@@ -101,15 +99,12 @@ async def upload_graph(
     file: UploadFile  = File(...),
     session: Session  = Depends(get_session),
 ):
-    # 1. Read bytes
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    # 2. Detect RDF format from filename / content-type
     rdf_format = _detect_rdf_format(file.filename, file.content_type)
 
-    # 3. Parse with rdflib to validate and count triples
     rdf_graph = rdflib.ConjunctiveGraph()
     try:
         rdf_graph.parse(data=content, format=rdf_format)
@@ -118,13 +113,11 @@ async def upload_graph(
 
     triples_count = len(rdf_graph)
 
-    # 4. Save file to storage/files/graphs/<uuid>_<original_filename>
     GRAPHS_STORAGE.mkdir(parents=True, exist_ok=True)
     unique_filename = f"{uuid.uuid4()}_{Path(file.filename).name}"
     dest_path = GRAPHS_STORAGE / unique_filename
     dest_path.write_bytes(content)
 
-    # 5. Persist Graph row
     db_graph = Graph(
         name=name,
         format=rdf_format,
@@ -137,7 +130,6 @@ async def upload_graph(
     session.add(db_graph)
     session.flush()  # get db_graph.id without closing transaction
 
-    # 6. Compute and insert subjects / predicates / objects
     _compute_graph_details(rdf_graph, db_graph, session)  # commits inside
 
     return {
@@ -186,14 +178,12 @@ def visualise_graph(
     if not graph:
         raise HTTPException(status_code=404, detail="Graph not found.")
 
-    # Load file from disk into rdflib
     rdf_graph = rdflib.ConjunctiveGraph()
     try:
         rdf_graph.parse(graph.file_path, format=graph.format)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to load graph: {exc}")
 
-    # Apply limit to avoid sending 10k nodes to frontend
     if len(rdf_graph) > limit:
         limited = rdflib.ConjunctiveGraph()
         for i, triple in enumerate(rdf_graph):

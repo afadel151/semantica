@@ -143,9 +143,7 @@ def delete_file(onto_id: uuid.UUID, session: Session = Depends(get_session)):
     return {"detail": f"Ontology '{onto.name}' deleted successfully."}
 
 
-# ─────────────────────────────────────────
-# OWL DETAIL  →  used by /owl/[id].vue
-# ─────────────────────────────────────────
+
 @router.get("/{onto_id}/owl")
 def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
     onto = session.get(Ontology, onto_id)
@@ -180,7 +178,6 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
     nodes = []
     edges = []
 
-    # Add owl:Thing as root node (virtual — not stored in DB)
     root_uri = str(OWL.Thing)
     nodes.append({
         "id": "owl:Thing",
@@ -265,7 +262,6 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
             "individual_count": len(cls_individuals),
         })
 
-        # ── Edges ────────────────────────────────────────────────────────────
         # subClassOf edges (excluding restriction BNodes)
         parents = [
             p for p in g.objects(cls_uri, RDFS.subClassOf)
@@ -307,9 +303,7 @@ def get_owl_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
         "edges": edges,
     }
 
-# ─────────────────────────────────────────
 # RDFS DETAIL  →  used by /rdfs/[id].vue
-# ─────────────────────────────────────────
 
 @router.get("/{onto_id}/rdfs")
 def get_rdfs_detail(onto_id: uuid.UUID, session: Session = Depends(get_session)):
