@@ -3,19 +3,18 @@ import { Codemirror } from 'vue-codemirror'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { keymap } from '@codemirror/view'
 import { defaultKeymap } from '@codemirror/commands'
-import { ArrowUpToLine, Eraser, Play } from 'lucide-vue-next'
-import { mapQueryToVariant } from '~/types/badge_variant';  
+import { ArrowUpToLine, Eraser, Play, CircleDot, TriangleAlert } from 'lucide-vue-next'
+import { mapQueryToVariant } from '~/types/badge_variant';
 import { sparql } from 'codemirror-lang-sparql';
 import { useSparqlState, useSparqlActions } from '~/composables/useSparql';
 
 // State from the composable
-const { query, history, activeGraphId } = useSparqlState();
+const { query, history, activeGraphId, activeGraphName } = useSparqlState();
 
 // Actions from the composable
-const { runQuery, clearState, loadFromHistory, fetchHistory, initDefaultGraph } = useSparqlActions();
+const { runQuery, clearState, loadFromHistory, fetchHistory } = useSparqlActions();
 
 onMounted(async () => {
-    await initDefaultGraph();
     await fetchHistory();
 });
 
@@ -45,10 +44,24 @@ function clearEditor() { clearState(); }
 </script>
 
 <template>
-  <div class="w-full h-fit overflow-auto flex flex-col gap-3 ">
+  <div class="w-full h-fit overflow-auto flex flex-col gap-3">
 
-    <!-- Query Templat  es -->
-
+    <!-- Active Graph Indicator -->
+    <div v-if="activeGraphId"
+        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 text-sm">
+        <CircleDot class="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+        <span class="text-green-700 dark:text-green-300 font-medium truncate">
+            Graphe actif : {{ activeGraphName }}
+        </span>
+    </div>
+    <div v-else
+        class="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
+        <TriangleAlert class="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+        <span class="text-amber-700 dark:text-amber-300">
+            Aucun graphe actif —
+            <NuxtLink to="/rdf" class="underline font-medium">Activer un graphe</NuxtLink>
+        </span>
+    </div>
 
     <!-- CodeMirror Editor -->
     <Card class="flex-1 flex flex-col h-[60%] ">

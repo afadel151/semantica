@@ -1,8 +1,11 @@
-import { ref } from "vue";
+import { useActiveGraphStore } from "~/store/active_graph";
 
 export const useSparqlState = () => {
-  // Shared State via useState for safety in Nuxt (SSR/CSR)
-  const activeGraphId = useState("sparql_active_graph_id", () => null);
+  // ── Graphe actif : on lit directement le store Pinia (source de vérité) ──
+  // Le store est alimenté par la page /rdf/[id].vue via le bouton "Set as Active"
+  const activeGraphStore = useActiveGraphStore();
+  const activeGraphId = computed(() => activeGraphStore.getId || null);
+  const activeGraphName = computed(() => activeGraphStore.getName || null);
 
   const query = useState(
     "sparql_query",
@@ -21,6 +24,7 @@ LIMIT 25`,
 
   return {
     activeGraphId,
+    activeGraphName,
     query,
     results,
     history,
@@ -33,25 +37,7 @@ export const useSparqlActions = () => {
   const { activeGraphId, query, results, history, isRunning, error } =
     useSparqlState();
   const config = useRuntimeConfig();
-  const apiUrl = config.public.apiBase || "http://localhost:8000/api/v1"; // Ajustez si nécessaire
-
-  // Initialiser le graphe actif (Prend le premier disponible)
-  const initDefaultGraph = async () => {
-    try {
-      if (activeGraphId.value) return; // Déjà set
-      const res = await $fetch(`${apiUrl}/rdf/files`);
-      if (res && res.length > 0) {
-        activeGraphId.value = res[0].id;
-      } else {
-        error.value =
-          "Aucun graphe RDF trouvé sur le serveur. Veuillez en uploader un d'abord.";
-      }
-    } catch (err) {
-      console.error("Failed to fetch graphs", err);
-      error.value =
-        "Erreur de connexion au serveur pour récupérer les graphes.";
-    }
-  };
+  const apiUrl = config.public.apiBase || "http://localhost:8000/api/v1";
 
   // Charger l'historique récent
   const fetchHistory = async () => {
@@ -71,13 +57,14 @@ export const useSparqlActions = () => {
     return match ? match[1].toUpperCase() : null;
   };
 
-  // Exécuter la requête
+  // Exécuter la requête UNIQUEMENT sur le graphe actif
   const runQuery = async () => {
     if (!query.value.trim() || isRunning.value) return;
 
+    // ── Vérification : graphe actif obligatoire ──────────────────────────────
     if (!activeGraphId.value) {
       error.value =
-        "Aucun graphe sélectionné ou disponible pour exécuter la requête.";
+        "⚠️ Aucun graphe actif. Rendez-vous dans Graphs → ouvrez un graphe → cliquez « Set as Active » avant d'exécuter une requête.";
       return;
     }
 
@@ -85,7 +72,7 @@ export const useSparqlActions = () => {
     error.value = null;
     results.value = null;
 
-    const type = detectQueryType(query.value) || "SELECT"; // Fallback
+    const type = detectQueryType(query.value) || "SELECT";
     const endpointMap = {
       SELECT: "select",
       ASK: "ask",
@@ -101,16 +88,14 @@ export const useSparqlActions = () => {
         method: "POST",
         body: {
           query: query.value,
-          graph_id: activeGraphId.value,
+          graph_id: activeGraphId.value, // ← toujours le graphe actif du store
         },
       });
 
       const execution_time = Math.round(performance.now() - startTime);
 
-      // Formatage des résultats pour correspondre au composant RightPanel
       if (type === "SELECT" || type === "DESCRIBE") {
         const rawData = res.result || [];
-        // On doit deviner les variables.
         const guessVarsMatch = query.value.match(/SELECT\s+(.*?)\s+WHERE/i);
         let vars = [];
         if (guessVarsMatch) {
@@ -120,77 +105,50 @@ export const useSparqlActions = () => {
             .filter((v) => v !== "*")
             .map((v) => v.replace("?", ""));
         }
-
-        // Si on a fait un SELECT *, on utilise len(rawData[0])
         if (vars.length === 0 && rawData.length > 0) {
           vars = rawData[0].map((_, i) => `col${i}`);
         }
-
         const rows = rawData.map((r) => {
           let obj = {};
           vars.forEach((v, i) => (obj[v] = r[i]));
           return obj;
         });
+        results.value = { type: "SELECT", vars, rows, execution_time };
 
-        results.value = {
-          type: "SELECT",
-          vars: vars,
-          rows: rows,
-          execution_time,
-        };
       } else if (type === "ASK") {
         results.value = {
           type: "ASK",
           result: res.result ? "TRUE" : "FALSE",
           execution_time,
         };
-      } else if (type === "CONSTRUCT") {
-        // CONSTRUCT retourne des triplets. On doit les mapper pour Cytoscape
-        console.log(res.result);
 
-        const rawData = res.result || []; // form [[s, p, o], ...]
+      } else if (type === "CONSTRUCT") {
+        const rawData = res.result || [];
         const elements = [];
         const nodesSet = new Set();
         rawData.forEach((triple) => {
           const [s, p, o] = triple;
           if (!s || !p || !o) return;
-
-          // Source node
           if (!nodesSet.has(s)) {
-            elements.push({
-              data: { id: s, label: s.split(/[/#]/).pop() || s, type: "uri" },
-            });
+            elements.push({ data: { id: s, label: s.split(/[/#]/).pop() || s, type: "uri" } });
             nodesSet.add(s);
           }
-          // Target node
           if (!nodesSet.has(o)) {
-            // determine if literal roughly (start with ")
             const isLiteral = String(o).startsWith('"');
-            elements.push({
-              data: {
-                id: o,
-                label: o.split(/[/#]/).pop() || o,
-                type: isLiteral ? "literal" : "uri",
-              },
-            });
+            elements.push({ data: { id: o, label: o.split(/[/#]/).pop() || o, type: isLiteral ? "literal" : "uri" } });
             nodesSet.add(o);
           }
-          // Edge
-          elements.push({
-            data: { source: s, target: o, label: p.split(/[/#]/).pop() || p },
-          });
+          elements.push({ data: { source: s, target: o, label: p.split(/[/#]/).pop() || p } });
         });
-
         results.value = {
           type: "CONSTRUCT",
           triple_count: rawData.length,
-          elements: elements,
+          elements,
           rawTriples: rawData,
           execution_time,
         };
       }
 
-      // Rafraichir l'historique après l'exec
       await fetchHistory();
     } catch (err) {
       console.error("Query Error:", err);
@@ -213,7 +171,6 @@ export const useSparqlActions = () => {
     query.value = h.query;
   };
 
-  // Fonction d'export
   const exportResultsFormat = (format) => {
     if (!activeGraphId.value || !query.value) return;
 
@@ -229,7 +186,7 @@ export const useSparqlActions = () => {
           a.href = URL.createObjectURL(blob);
           a.download = `construct.${format}`;
           a.click();
-          URL.revokeObjectURL(a.href); // ✅ cleanup
+          URL.revokeObjectURL(a.href);
         });
       return;
     }
@@ -239,7 +196,6 @@ export const useSparqlActions = () => {
   };
 
   return {
-    initDefaultGraph,
     fetchHistory,
     runQuery,
     detectQueryType,

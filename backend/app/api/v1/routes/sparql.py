@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 import csv
 import json
 import tempfile
+import xml.etree.ElementTree as ET
 from pydantic import BaseModel
 from rdflib import Graph as RDFGraph
 
@@ -181,7 +182,7 @@ def run_construct(
 def export_result(
     query: str,
     graph_id: uuid.UUID,
-    format: str = Query("json", enum=["json", "csv"]),
+    format: str = Query("json", enum=["json", "csv", "xml"]),
     session: Session = Depends(get_session)
 ):
 
@@ -208,16 +209,12 @@ def export_result(
 
     # -------- EXPORT JSON --------
     if format == "json":
-
         data = []
         for row in rows:
             data.append(dict(zip(headers, row)))
-
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".json")
-
         with open(temp_file.name, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
-
         return FileResponse(
             path=temp_file.name,
             filename="sparql_result.json",
@@ -226,26 +223,53 @@ def export_result(
 
     # -------- EXPORT CSV --------
     if format == "csv":
-
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".csv")
-
         with open(temp_file.name, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(headers)
             writer.writerows(rows)
-
         return FileResponse(
             path=temp_file.name,
             filename="sparql_result.csv",
             media_type="text/csv"
         )
 
+    # -------- EXPORT XML (SPARQL Results Format W3C) --------
+    if format == "xml":
+        root = ET.Element("sparql", xmlns="http://www.w3.org/2005/sparql-results#")
+        head = ET.SubElement(root, "head")
+        for var in headers:
+            ET.SubElement(head, "variable", name=var)
+        results_el = ET.SubElement(root, "results")
+        for row in rows:
+            binding_el = ET.SubElement(results_el, "result")
+            for var, val in zip(headers, row):
+                b = ET.SubElement(binding_el, "binding", name=var)
+                if val.startswith("http") or val.startswith("urn:"):
+                    uri_el = ET.SubElement(b, "uri")
+                    uri_el.text = val
+                elif val.startswith("_:"):
+                    bnode_el = ET.SubElement(b, "bnode")
+                    bnode_el.text = val[2:]
+                else:
+                    lit_el = ET.SubElement(b, "literal")
+                    lit_el.text = val
+        tree = ET.ElementTree(root)
+        ET.indent(tree, space="  ")
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xml")
+        with open(temp_file.name, "wb") as f:
+            tree.write(f, encoding="utf-8", xml_declaration=True)
+        return FileResponse(
+            path=temp_file.name,
+            filename="sparql_result.xml",
+            media_type="application/sparql-results+xml"
+        )
 
 
 @router.post("/export/construct")
 def export_construct(
     data: ConstructExportRequest,
-    format: str = Query("json", enum=["json", "csv"])
+    format: str = Query("json", enum=["json", "csv", "xml"])
 ):
     triples = data.triples
 
@@ -272,6 +296,26 @@ def export_construct(
             path=temp_file.name,
             filename="construct_result.csv",
             media_type="text/csv"
+        )
+
+    if format == "xml":
+        from rdflib import Graph as RDFGraph, URIRef, Literal, BNode
+        g = RDFGraph()
+        for t in triples:
+            s_val = t[0]; p_val = t[1]; o_val = t[2]
+            s = BNode(s_val[2:]) if s_val.startswith("_:") else URIRef(s_val)
+            p = URIRef(p_val)
+            if o_val.startswith("http") or o_val.startswith("urn:") or o_val.startswith("_:"):
+                o = BNode(o_val[2:]) if o_val.startswith("_:") else URIRef(o_val)
+            else:
+                o = Literal(o_val)
+            g.add((s, p, o))
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xml")
+        g.serialize(destination=temp_file.name, format="xml")
+        return FileResponse(
+            path=temp_file.name,
+            filename="construct_result.xml",
+            media_type="application/rdf+xml"
         )
 
 # ----------------------------
