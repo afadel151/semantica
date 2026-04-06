@@ -61,23 +61,163 @@ def get_recent_queries(session: Session = Depends(get_session)):
     return queries
 
 
-# fonction interne pour exécuter SPARQL
-def execute_sparql(query: str, graph_path: str):
+import urllib.parse
+import re
+from rdflib import URIRef, RDF as _RDF
 
+
+def preprocess_sparql_star(query: str) -> str:
+    """Convert << ?s ?p ?o >> patterns to standard RDF reification blank-node syntax."""
+    def split_triple(inner: str):
+        parts = []
+        current = ""
+        in_uri = False
+        in_quote = False
+        in_bnode = 0
+        for char in inner:
+            if char == '<' and not in_quote:
+                in_uri = True
+            elif char == '>' and not in_quote:
+                in_uri = False
+            elif char == '"':
+                in_quote = not in_quote
+            elif char == '[' and not in_quote and not in_uri:
+                in_bnode += 1
+            elif char == ']' and not in_quote and not in_uri:
+                in_bnode -= 1
+            elif char.isspace() and not in_uri and not in_quote and in_bnode == 0:
+                if current:
+                    parts.append(current)
+                    current = ""
+                continue
+            current += char
+        if current:
+            parts.append(current)
+        return parts
+
+    def replacer(match):
+        inner = match.group(1).strip()
+        parts = split_triple(inner)
+        if len(parts) >= 3:
+            s = parts[0]
+            p = parts[1]
+            o = " ".join(parts[2:])
+            return (
+                f"[ <http://www.w3.org/1999/02/22-rdf-syntax-ns#subject> {s} "
+                f"; <http://www.w3.org/1999/02/22-rdf-syntax-ns#predicate> {p} "
+                f"; <http://www.w3.org/1999/02/22-rdf-syntax-ns#object> {o} ]"
+            )
+        return match.group(0)
+
+    prev = ""
+    while "<<" in query and ">>" in query and query != prev:
+        prev = query
+        query = re.sub(r'<<\s*((?:(?!<<|>>).)*?)\s*>>', replacer, query, flags=re.DOTALL)
+    return query
+
+
+def _add_reification_in_memory(g: RDFGraph) -> None:
+    """For every urn:rdf-star: URI in the graph, inject rdf:subject/predicate/object triples."""
+    prefix_str = ""
+    for k, v in g.namespaces():
+        prefix_str += f"@prefix {k if k else ''}: <{v}> .\n"
+
+    star_nodes: set = set()
+    for s, _p, o in g:
+        if isinstance(s, URIRef) and str(s).startswith("urn:rdf-star:"):
+            star_nodes.add(s)
+        if isinstance(o, URIRef) and str(o).startswith("urn:rdf-star:"):
+            star_nodes.add(o)
+
+    for node in star_nodes:
+        if (node, _RDF.subject, None) in g:
+            continue  # already reified
+        encoded = str(node)[len("urn:rdf-star:"):]
+        decoded = urllib.parse.unquote(encoded)
+        sub_g = RDFGraph()
+        try:
+            sub_g.parse(data=f"{prefix_str}\n{decoded} .", format="turtle")
+            s_in, p_in, o_in = next(iter(sub_g))
+            g.add((node, _RDF.type, _RDF.Statement))
+            g.add((node, _RDF.subject, s_in))
+            g.add((node, _RDF.predicate, p_in))
+            g.add((node, _RDF.object, o_in))
+        except Exception:
+            pass
+
+
+# Universal SPARQL executor
+def execute_sparql(query: str, graph_path: str) -> dict:
+    """
+    Handles SELECT, ASK, DESCRIBE, CONSTRUCT + SPARQL-star + FILTER/BIND/OPTIONAL etc.
+    Returns: { type, boolean, headers, rows, graph_ttl }
+    """
     g = RDFGraph()
     g.parse(graph_path)
 
-    results = g.query(query)
+    # SPARQL-star: inject reification in-memory, then rewrite query
+    if "<<" in query and ">>" in query:
+        _add_reification_in_memory(g)
+        query = preprocess_sparql_star(query)
 
-    data = []
+    # Detect query type: strip comments / PREFIX / BASE, then find the first keyword
+    def _detect_type(q: str) -> str:
+        # Remove comments
+        cleaned = re.sub(r'#[^\n]*', '', q)
+        # Remove PREFIX and BASE declarations (can be multiline)
+        cleaned = re.sub(r'(?i)\b(PREFIX|BASE)\s+\S+\s*<[^>]*>', '', cleaned)
+        cleaned = cleaned.strip()
+        # Match the first SPARQL keyword
+        m = re.match(r'(?i)\s*(ASK|DESCRIBE|CONSTRUCT|SELECT)\b', cleaned)
+        if m:
+            return m.group(1).upper()
+        return "SELECT"
 
-    for row in results:
-        data.append([str(x) for x in row])
+    q_type = _detect_type(query)
 
-    return data
+    try:
+        results = g.query(query)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"SPARQL error: {exc}")
+
+    def decode_val(v) -> str:
+        if v is None:
+            return ""
+        val = str(v)
+        if val.startswith("urn:rdf-star:"):
+            return f"<< {urllib.parse.unquote(val[len('urn:rdf-star:'):])} >>"
+        return val
+
+    try:
+        if q_type == "ASK":
+            return {"type": "ASK", "boolean": bool(results), "headers": [], "rows": [], "graph_ttl": None}
+
+        if q_type in ("DESCRIBE", "CONSTRUCT"):
+            result_graph = RDFGraph()
+            for ns_p, ns_u in g.namespaces():
+                result_graph.bind(ns_p, ns_u)
+            triples = []
+            for triple in results:
+                if isinstance(triple, tuple) and len(triple) == 3:
+                    s, p, o = triple
+                    result_graph.add((s, p, o))
+                    triples.append([decode_val(s), decode_val(p), decode_val(o)])
+            ttl = result_graph.serialize(format="turtle")
+            return {"type": q_type, "boolean": None, "headers": ["subject", "predicate", "object"], "rows": triples, "graph_ttl": ttl}
+
+        # SELECT (FILTER, BIND, OPTIONAL, GROUP BY, HAVING, etc. are natively handled by RDFLib)
+        vars_list = getattr(results, "vars", None) or []
+        headers = [str(v) for v in vars_list]
+        rows = [[decode_val(v) for v in row] for row in results]
+        return {"type": "SELECT", "boolean": None, "headers": headers, "rows": rows, "graph_ttl": None}
+
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"SPARQL error: {exc}")
 
 
-# SELECT
+# ─── Universal query endpoint ───────────────────────────────────────────────
+
+# SELECT (kept for backward compat - delegates to universal executor)
 @router.post("/select")
 def run_select(
     data: SparqlQueryRequest,
@@ -89,18 +229,24 @@ def run_select(
     if not graph:
         raise HTTPException(status_code=404, detail="Graph not found")
 
-    result = execute_sparql(data.query, graph.file_path)
+    try:
+        result = execute_sparql(data.query, graph.file_path)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"SPARQL error: {exc}")
 
     history = SparqlHistory(
         query=data.query,
-        query_type="SELECT",
+        query_type=result["type"],
         graph_id=data.graph_id
     )
-
     session.add(history)
     session.commit()
 
-    return {"result": result}
+    return result
+
+
 
 
 # ASK

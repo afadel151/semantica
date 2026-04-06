@@ -102,18 +102,11 @@ export const useSparqlActions = () => {
     results.value = null;
     updateResult.value = null;
 
-    const endpointMap = {
-      SELECT: "select",
-      ASK: "ask",
-      CONSTRUCT: "construct",
-      DESCRIBE: "describe",
-    };
-    const endpoint = endpointMap[type] || "select";
-
     const startTime = performance.now();
 
     try {
-      const res = await $fetch(`${apiUrl}/sparql/${endpoint}`, {
+      // ✅ All query types go through the unified /select endpoint
+      const res = await $fetch(`${apiUrl}/sparql/select`, {
         method: "POST",
         body: {
           query: query.value,
@@ -122,44 +115,18 @@ export const useSparqlActions = () => {
       });
 
       const execution_time = Math.round(performance.now() - startTime);
+      const responseType = res.type || type;
 
-      if (type === "SELECT" || type === "DESCRIBE") {
-        const rawData = res.result || [];
-        const guessVarsMatch = query.value.match(/SELECT\s+(.*?)\s+WHERE/i);
-        let vars = [];
-        if (guessVarsMatch) {
-          vars = guessVarsMatch[1]
-            .trim()
-            .split(/\s+/)
-            .filter((v) => v !== "*")
-            .map((v) => v.replace("?", ""));
-        }
-        if (vars.length === 0 && rawData.length > 0) {
-          vars = rawData[0].map((_, i) => `col${i}`);
-        }
-        const rows = rawData.map((r) => {
-          let obj = {};
-          vars.forEach((v, i) => (obj[v] = r[i]));
-          return obj;
-        });
-        results.value = {
-          type: "SELECT",
-          vars,
-          rows,
-          execution_time,
-          graph_size: schema.value?.graph_size || 0,
-        };
-
-      } else if (type === "ASK") {
+      if (responseType === "ASK") {
         results.value = {
           type: "ASK",
-          result: res.result ? "TRUE" : "FALSE",
+          result: res.boolean ? "TRUE" : "FALSE",
           execution_time,
           graph_size: schema.value?.graph_size || 0,
         };
 
-      } else if (type === "CONSTRUCT") {
-        const rawData = res.result || [];
+      } else if (responseType === "CONSTRUCT" || responseType === "DESCRIBE") {
+        const rawData = res.rows || [];
         const elements = [];
         const nodesSet = new Set();
         rawData.forEach((triple) => {
@@ -170,17 +137,34 @@ export const useSparqlActions = () => {
             nodesSet.add(s);
           }
           if (!nodesSet.has(o)) {
-            const isLiteral = String(o).startsWith('"');
+            const isLiteral = !String(o).startsWith("http") && !String(o).startsWith("urn:");
             elements.push({ data: { id: o, label: o.split(/[/#]/).pop() || o, type: isLiteral ? "literal" : "uri" } });
             nodesSet.add(o);
           }
           elements.push({ data: { source: s, target: o, label: p.split(/[/#]/).pop() || p } });
         });
         results.value = {
-          type: "CONSTRUCT",
+          type: responseType,
           triple_count: rawData.length,
           elements,
           rawTriples: rawData,
+          graph_ttl: res.graph_ttl || null,
+          execution_time,
+          graph_size: schema.value?.graph_size || 0,
+        };
+
+      } else {
+        // SELECT (default)
+        const headers = res.headers || [];
+        const rows = (res.rows || []).map((r) => {
+          const obj = {};
+          headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
+          return obj;
+        });
+        results.value = {
+          type: "SELECT",
+          vars: headers,
+          rows,
           execution_time,
           graph_size: schema.value?.graph_size || 0,
         };

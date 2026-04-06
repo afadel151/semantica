@@ -1,10 +1,12 @@
 <script setup>
 import { PlusCircle } from 'lucide-vue-next';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const emit = defineEmits(['uploaded', 'error'])
 
 
 const file_name = ref('')
+const graph_type = ref('RDF')
 const file = ref(null)
 const error = ref('')
 
@@ -21,6 +23,7 @@ const loadFile = async () => {
     try {
         const form = new FormData()
         form.append('name', file_name.value)
+        form.append('graph_type', graph_type.value)
         form.append('file', file.value)
         await $fetch(`${config.public.apiBase}/rdf/upload`, {  
             method: 'POST',
@@ -53,6 +56,20 @@ const loadFile = async () => {
                 <div class="grid gap-3">
                     <Label for="name-1">File Name</Label>
                     <Input v-model="file_name" default-value="new_file" />
+                </div>
+                <div class="grid gap-3">
+                    <Label>Graph Type</Label>
+                    <Select v-model="graph_type">
+                        <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectGroup>
+                                <SelectItem value="RDF">RDF</SelectItem>
+                                <SelectItem value="RDF★">RDF★</SelectItem>
+                            </SelectGroup>
+                        </SelectContent>
+                    </Select>
                 </div>
                 <div class="grid gap-3">
                     <Label for="username-1">File</Label>

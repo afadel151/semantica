@@ -18,6 +18,7 @@ class Graph(SQLModel, table=True):
     file_size: int                  = Field(nullable=False)
     triples_count: int              = Field(nullable=False, default=0)
     uploaded_at: datetime           = Field(nullable=False, default_factory=datetime.utcnow)
+    graph_type: str                 = Field(default="RDF", nullable=False)
 
     subjects:       List["Subject"]       = Relationship(back_populates="graph", cascade_delete=True)
     predicates:     List["Predicate"]     = Relationship(back_populates="graph", cascade_delete=True)
@@ -34,6 +35,7 @@ class Subject(SQLModel, table=True):
     prefix_form: Optional[str] = Field(default=None, nullable=True)
     rdf_type: Optional[str]    = Field(default=None, nullable=True)
     predicate_count: int       = Field(default=0)
+    is_star: bool              = Field(default=False)
 
     graph: Optional[Graph]     = Relationship(back_populates="subjects")
 
@@ -63,6 +65,7 @@ class Object(SQLModel, table=True):
     datatype: Optional[str]    = Field(default=None, nullable=True)
     language: Optional[str]    = Field(default=None, nullable=True)
     referenced_by: int         = Field(default=0)
+    is_star: bool              = Field(default=False)
 
     graph: Optional[Graph]     = Relationship(back_populates="objects")
 

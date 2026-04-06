@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
+import urllib.parse
 from rdflib.namespace import RDF, RDFS, OWL, XSD
 import rdflib
 from rdflib import URIRef, Literal, BNode
@@ -35,6 +36,7 @@ _FORMAT_MAP: dict[str, str] = {
     ".jsonld": "json-ld",
     ".json":   "json-ld",
     ".trix":   "trix",
+    ".ttls":   "turtle",
 }
 _MIME_FORMAT_MAP: dict[str, str] = {
     "text/turtle":                    "turtle",
@@ -78,12 +80,27 @@ def _build_ns_bindings(g: rdflib.Graph) -> dict[str, str]:
             bindings[str(ns)] = str(prefix)
     return bindings
 
-def _node_kind(node) -> str:
+def _parse_node(node) -> tuple[str, str, bool]:
     if isinstance(node, URIRef):
-        return "uri"
+        uri_str = str(node)
+        if uri_str.startswith("urn:rdf-star:"):
+            encoded = uri_str[13:]  # len("urn:rdf-star:")
+            decoded = urllib.parse.unquote(encoded)
+            return (f"<< {decoded} >>", "statement", True)
+        return (uri_str, "uri", False)
     if isinstance(node, BNode):
-        return "blank"
-    return "literal"
+        return (str(node), "blank", False)
+    if isinstance(node, Literal):
+        return (str(node), "literal", False)
+    
+    # Handle RDF-star nested triples (which might expose an indexable triple structure)
+    try:
+        s_val, _, _ = _parse_node(node[0])
+        p_val, _, _ = _parse_node(node[1])
+        o_val, _, _ = _parse_node(node[2])
+        return (f"<< {s_val} {p_val} {o_val} >>", "statement", True)
+    except Exception:
+        return (str(node), "statement", True)
 
 
 
@@ -105,12 +122,12 @@ def _compute_graph_details(
     RDF_TYPE = str(RDF.type)
 
     for s, p, o in rdf_graph:
-        s_str = str(s)
-        p_str = str(p)
-        o_str = str(o)
+        s_str, s_kind, s_is_star = _parse_node(s)
+        p_str, p_kind, p_is_star = _parse_node(p)
+        o_str, o_kind, o_is_star = _parse_node(o)
 
         if s_str not in subj_map:
-            subj_map[s_str] = {"predicate_count": 0, "rdf_type": None}
+            subj_map[s_str] = {"predicate_count": 0, "rdf_type": None, "is_star": s_is_star}
         subj_map[s_str]["predicate_count"] += 1
         if p_str == RDF_TYPE and subj_map[s_str]["rdf_type"] is None:
             subj_map[s_str]["rdf_type"] = o_str
@@ -126,7 +143,7 @@ def _compute_graph_details(
             if s_str in pred_map:
                 pred_map[s_str]["ranges"].add(o_str)
 
-        kind = _node_kind(o)
+        kind = o_kind
         obj_key = o_str  
 
         if obj_key not in obj_map:
@@ -136,15 +153,15 @@ def _compute_graph_details(
                 "language": None,
                 "prefix_form": None,
                 "referenced_by": 0,
+                "is_star": o_is_star,
             }
             if kind == "uri":
                 obj_map[obj_key]["prefix_form"] = _prefix_form(o_str, ns_bindings)
-            elif kind == "literal":
-                lit: Literal = o  
-                if lit.datatype:
-                    obj_map[obj_key]["datatype"] = str(lit.datatype)
-                if lit.language:
-                    obj_map[obj_key]["language"] = lit.language
+            elif kind == "literal" and isinstance(o, Literal):
+                if o.datatype:
+                    obj_map[obj_key]["datatype"] = str(o.datatype)
+                if o.language:
+                    obj_map[obj_key]["language"] = o.language
         obj_map[obj_key]["referenced_by"] += 1
 
     for p_str, info in pred_map.items():
@@ -160,6 +177,7 @@ def _compute_graph_details(
                 "prefix_form":     _prefix_form(uri, ns_bindings),
                 "rdf_type":        info["rdf_type"],
                 "predicate_count": info["predicate_count"],
+                "is_star":         info["is_star"],
             }
             for uri, info in subj_map.items()
         ],
@@ -191,6 +209,7 @@ def _compute_graph_details(
                 "datatype":      info["datatype"],
                 "language":      info["language"],
                 "referenced_by": info["referenced_by"],
+                "is_star":       info["is_star"],
             }
             for value, info in obj_map.items()
         ],
@@ -241,52 +260,100 @@ def safe_qname(g: Graph, uri) -> str:
         return safe_label(g, uri)
 
 
+import urllib.parse
+
 def graph_to_cytoscape(rdf_graph: rdflib.ConjunctiveGraph) -> dict:
     nodes = {}
     edges = []
 
-    for subject, predicate, obj in rdf_graph:
-        # Subject node
-        s_id = str(subject)
-        if s_id not in nodes:
-            nodes[s_id] = {
-                "data": {
-                    "id":    s_id,
-                    "label": safe_label(rdf_graph, subject),
-                    "type":  "blank" if isinstance(subject, rdflib.BNode) else "uri"
-                }
-            }
+    prefix_str = ""
+    for k, v in rdf_graph.namespaces():
+        prefix_str += f"@prefix {k if k else ''}: <{v}> .\n"
 
-        # Object node
-        o_id = str(obj)
-        if isinstance(obj, rdflib.Literal):
-            node_id = f"lit_{hash(o_id + s_id)}"
-            if node_id not in nodes:
-                nodes[node_id] = {
+    def process_node(node_obj) -> str:
+        n_id = str(node_obj)
+        if isinstance(node_obj, rdflib.Literal):
+            n_id = f"lit_{hash(n_id)}"
+            if n_id not in nodes:
+                nodes[n_id] = {
                     "data": {
-                        "id":    node_id,
-                        "label": str(obj)[:30],   # truncate long literals
+                        "id":    n_id,
+                        "label": str(node_obj)[:30],
                         "type":  "literal"
                     }
                 }
-            o_id = node_id
-        else:
-            if o_id not in nodes:
-                nodes[o_id] = {
-                    "data": {
-                        "id":    o_id,
-                        "label": safe_label(rdf_graph, obj),
-                        "type":  "blank" if isinstance(obj, rdflib.BNode) else "uri"
-                    }
-                }
+            return n_id
 
-        # Edge
+        if n_id.startswith("urn:rdf-star:"):
+            if n_id not in nodes:
+                encoded = n_id[len("urn:rdf-star:"):]
+                decoded = urllib.parse.unquote(encoded)
+                sub_g = rdflib.Graph()
+                try:
+                    sub_g.parse(data=f"{prefix_str}\n{decoded} .", format="turtle")
+                    s_in, p_in, o_in = next(iter(sub_g))
+                    
+                    s_in_id = process_node(s_in)
+                    o_in_id = process_node(o_in)
+                    
+                    nodes[n_id] = {
+                        "data": {
+                            "id": n_id,
+                            "label": safe_qname(rdf_graph, p_in),
+                            "type": "statement",
+                            "tooltip": f"<< {decoded} >>"
+                        }
+                    }
+                    edges.append({
+                        "data": {
+                            "id": f"e_sub_{n_id}",
+                            "source": s_in_id,
+                            "target": n_id,
+                            "label": "",
+                            "type": "star_internal"
+                        }
+                    })
+                    edges.append({
+                        "data": {
+                            "id": f"e_obj_{n_id}",
+                            "source": n_id,
+                            "target": o_in_id,
+                            "label": "",
+                            "type": "star_internal"
+                        }
+                    })
+                except Exception:
+                    # Fallback if parsing fails
+                    nodes[n_id] = {
+                        "data": {
+                            "id": n_id,
+                            "label": "Statement",
+                            "type": "statement"
+                        }
+                    }
+            return n_id
+
+        if n_id not in nodes:
+            nodes[n_id] = {
+                "data": {
+                    "id":    n_id,
+                    "label": safe_label(rdf_graph, node_obj),
+                    "type":  "blank" if isinstance(node_obj, rdflib.BNode) else "uri"
+                }
+            }
+        return n_id
+
+    for subject, predicate, obj in rdf_graph:
+        s_id = process_node(subject)
+        o_id = process_node(obj)
+
         edges.append({
             "data": {
                 "id":     f"{s_id}__{str(predicate)}__{o_id}",
                 "source": s_id,
                 "target": o_id,
-                "label":  safe_qname(rdf_graph, predicate)
+                "label":  safe_qname(rdf_graph, predicate),
+                "type":   "standard"
             }
         })
 

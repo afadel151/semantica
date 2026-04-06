@@ -9,6 +9,7 @@ import {
     TableRow,
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Eye, RefreshCcw } from 'lucide-vue-next'
 import DeleteGraph from './DeleteGraph.vue'
 import LoadGraph from './LoadGraph.vue'
@@ -30,6 +31,7 @@ const sortOrder = ref('asc')
 const columns = [
     { key: 'name', label: 'Name' },
     { key: 'format', label: 'Format' },
+    { key: 'graph_type', label: 'Type' },
     { key: 'triples_count', label: 'Triples' },
     { key: 'file_size', label: 'Size (Kb)' },
     { key: 'uploaded_at', label: 'Uploaded' },
@@ -148,7 +150,14 @@ const handleError = () => {
                 </TableRow>
                 <TableRow v-for="graph in paginatedGraphs" :key="graph.id ?? graph.name">
                     <TableCell v-for="col in filteredColumns" :key="col.key">
-                        {{ graph[col.key] ?? '—' }}
+                        <template v-if="col.key === 'graph_type'">
+                            <Badge :variant="graph[col.key] === 'RDF★' ? 'default' : 'secondary'">
+                                {{ graph[col.key] || 'RDF' }}
+                            </Badge>
+                        </template>
+                        <template v-else>
+                            {{ graph[col.key] ?? '—' }}
+                        </template>
                     </TableCell>
 
                     <TableCell class="text-right  space-x-2 justify-end">

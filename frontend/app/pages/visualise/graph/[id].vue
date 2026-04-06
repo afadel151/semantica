@@ -95,6 +95,18 @@ function initCytoscape(elements: any[]) {
                 }
             },
             {
+                selector: 'node[type = "statement"]',
+                style: {
+                    'background-color': '#FFD700',
+                    'label': 'data(label)',
+                    'color': '#000',
+                    'font-size': '10px',
+                    'shape': 'diamond',
+                    'width': '60px',
+                    'height': '60px',
+                }
+            },
+            {
                 selector: 'node:selected',
                 style: {
                     'border-width': 3,
@@ -114,6 +126,14 @@ function initCytoscape(elements: any[]) {
                     'text-background-color': '#ffffff',
                     'text-background-opacity': 1,
                     'text-background-padding': '2px',
+                }
+            },
+            {
+                selector: 'edge[type = "star_internal"]',
+                style: {
+                    'line-style': 'dashed',
+                    'width': 2,
+                    'opacity': 0.6
                 }
             },
             {
@@ -215,6 +235,10 @@ onBeforeUnmount(() => { cyInstance?.destroy() })
             <div class="flex items-center gap-1.5">
                 <span class="w-3 h-3 rotate-45 bg-slate-400 inline-block"></span>
                 <span class="text-xs text-muted-foreground">Blank Node</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+                <span class="w-3 h-3 rotate-45 bg-yellow-400 inline-block"></span>
+                <span class="text-xs text-muted-foreground">Nested Statement</span>
             </div>
         </div>
 
