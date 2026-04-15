@@ -1,0 +1,38 @@
+# Prefixes
+@prefix ex:    <http://example.org/> .
+@prefix schema: <https://schema.org/> .
+@prefix prov:   <http://www.w3.org/ns/prov#> .
+@prefix xsd:    <http://www.w3.org/2001/XMLSchema#> .
+
+# ── Base triples ───────────────────────────────────────────
+
+ex:alice  schema:name    "Alice Durand" .
+ex:alice  schema:knows   ex:bob .
+ex:bob    schema:name    "Bob Müller" .
+ex:bob    schema:worksAt ex:orgA .
+ex:orgA   schema:name    "Acme Research" .
+
+ex:paper1 schema:name    "Advances in RDF-Star" .
+ex:paper1 schema:author  ex:alice .
+ex:paper1 schema:author  ex:bob .
+ex:paper1 schema:year    "2024"^^xsd:gYear .
+
+# ── RDF-Star: annotate the authorship triples ───────────────
+
+# confidence that Alice authored paper1 (assertion triple used as subject)
+<< ex:paper1 schema:author ex:alice >>
+    ex:confidence  "0.97"^^xsd:decimal ;
+    prov:wasAttributedTo ex:curator1 ;
+    ex:assertedOn  "2024-03-10"^^xsd:date .
+
+# lower confidence for Bob (from a different source)
+<< ex:paper1 schema:author ex:bob >>
+    ex:confidence  "0.82"^^xsd:decimal ;
+    prov:wasAttributedTo ex:curator2 ;
+    ex:assertedOn  "2024-03-15"^^xsd:date .
+
+# annotation on the knows relationship
+<< ex:alice schema:knows ex:bob >>
+    ex:confidence  "0.91"^^xsd:decimal ;
+    prov:wasAttributedTo ex:curator1 ;
+    ex:source      "DBLP co-authorship graph" .

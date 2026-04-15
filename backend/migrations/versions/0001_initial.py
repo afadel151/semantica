@@ -24,6 +24,7 @@ def upgrade() -> None:
         sa.Column("file_name",     sa.String(),   nullable=False),
         sa.Column("file_path",     sa.String(),   nullable=False),
         sa.Column("file_size",     sa.Integer(),  nullable=False),
+        sa.Column("graph_type",     sa.String(),  nullable=False),
         sa.Column("triples_count", sa.Integer(),  nullable=False, server_default="0"),
         sa.Column("uploaded_at",   sa.DateTime(), nullable=False,
                   server_default=sa.text("(datetime('now'))")),
@@ -38,6 +39,7 @@ def upgrade() -> None:
         sa.Column("prefix_form",     sa.String(),  nullable=True),
         sa.Column("rdf_type",        sa.String(),  nullable=True),
         sa.Column("predicate_count", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("is_star", sa.Boolean(), nullable=False, server_default=sa.text("0")),
     )
     op.create_index("ix_subjects_graph_id", "subjects", ["graph_id"])
 
@@ -65,6 +67,7 @@ def upgrade() -> None:
         sa.Column("datatype",      sa.String(),  nullable=True),
         sa.Column("language",      sa.String(),  nullable=True),
         sa.Column("referenced_by", sa.Integer(), nullable=False, server_default="0"),
+        sa.Column("is_star", sa.Boolean(), nullable=False, server_default=sa.text("0")),
     )
     op.create_index("ix_objects_graph_id", "objects", ["graph_id"])
 
