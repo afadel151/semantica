@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: semantica-backend
+    restart: unless-stopped
+    networks:
+      - semantica-network
+    volumes:
+      - backend-data:/app/app/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: semantica-frontend
+    restart: unless-stopped
+    networks:
+      - semantica-network
+    environment:
+      - NUXT_PUBLIC_API_BASE_URL=http://backend:8000/api/v1
+    depends_on:
+      - backend
+
+  nginx:
+    image: nginx:alpine
+    container_name: semantica-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - semantica-network
+    depends_on:
+      - frontend
+      - backend
+
+networks:
+  semantica-network:
+    driver: bridge
+
+volumes:
+  backend-data:
