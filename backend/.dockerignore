@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+env/
+build/
+dist/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+docs/
+*.md
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Database (will be created in container)
+app/storage/database/*.db
+app/storage/database/*.db-shm
+app/storage/database/*.db-wal
+
+# Logs
+*.log
+
+# PyInstaller
+backend-server.spec
