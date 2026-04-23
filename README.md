@@ -52,6 +52,10 @@ See [docs/DEV.md](docs/DEV.md) to run the app in development mode.
 
 See [docs/BUILD.md](docs/BUILD.md) to produce a distributable desktop binary.
 
+### Docker Deployment
+
+See [docs/DOCKER.md](docs/DOCKER.md) to build and deploy using Docker containers (frontend + backend only, no Tauri).
+
 ---
 
 ## Documentation
@@ -62,6 +66,7 @@ See [docs/BUILD.md](docs/BUILD.md) to produce a distributable desktop binary.
 | [docs/SETUP.md](docs/SETUP.md) | Installation and configuration instructions |
 | [docs/DEV.md](docs/DEV.md) | Running the app locally in development mode |
 | [docs/BUILD.md](docs/BUILD.md) | Building a production desktop binary with Tauri |
+| [docs/DOCKER.md](docs/DOCKER.md) | Building and deploying with Docker (frontend + backend only) |
 | [docs/API.md](docs/API.md) | REST API reference (endpoints, request/response schemas) |
 | [docs/MODELS.md](docs/MODELS.md) | Database model reference (tables, columns, relationships) |
 
