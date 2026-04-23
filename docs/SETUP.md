@@ -10,8 +10,12 @@ cd semantica
 cd frontend
 npm install
 cd ../backend
+source .venv/bin/activate # .venv/Scripts/activate
 uv sync 
 cd /app/storage/database && touch database.db
+cd ../../../
+alembic upgrade head
+
 ```
 3. compile fastAPI to binary
 ```bash
